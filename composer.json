@@ -32,12 +32,7 @@
         "sort-packages": true,
         "optimize-autoloader": true
     },
-    "scripts": {
-        "post-create-project-cmd": [
-            "@php application app:rename"
-        ]
-    },
     "minimum-stability": "dev",
     "prefer-stable": true,
-    "bin": ["rocket"]
+    "bin": ["builds/rocket"]
 }
