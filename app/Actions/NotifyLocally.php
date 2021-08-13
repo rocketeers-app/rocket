@@ -10,8 +10,6 @@ class NotifyLocally
 
     public function handle($message, $console)
     {
-        // $this->notify($message, 'icon.png');
-
         $console->info($message);
     }
 }
