@@ -16,21 +16,21 @@ class ImportRemoteDatabase
 
         $process = Ssh::create('rocketeer', $server)
             ->execute([
-                'grep DB_DATABASE /var/www/'.$site."/current/.env | grep -v -e '^\s*#' | cut -d '=' -f 2-",
+                'sudo grep DB_DATABASE /var/www/'.$site."/current/.env | grep -v -e '^\s*#' | cut -d '=' -f 2-",
             ]);
 
         $database = trim($process->getOutput());
 
         $process = Ssh::create('rocketeer', $server)
             ->execute([
-                'grep DB_USERNAME /var/www/'.$site."/current/.env | grep -v -e '^\s*#' | cut -d '=' -f 2-",
+                'sudo grep DB_USERNAME /var/www/'.$site."/current/.env | grep -v -e '^\s*#' | cut -d '=' -f 2-",
             ]);
 
         $username = trim($process->getOutput());
 
         $process = Ssh::create('rocketeer', $server)
             ->execute([
-                'grep DB_PASSWORD /var/www/'.$site."/current/.env | grep -v -e '^\s*#' | cut -d '=' -f 2-",
+                'sudo grep DB_PASSWORD /var/www/'.$site."/current/.env | grep -v -e '^\s*#' | cut -d '=' -f 2-",
             ]);
 
         $password = trim($process->getOutput());
