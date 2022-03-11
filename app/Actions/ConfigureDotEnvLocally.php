@@ -19,6 +19,7 @@ class ConfigureDotEnvLocally
         $env = preg_replace('/^DB_PASSWORD=(.*)/m', 'DB_PASSWORD=', $env);
         $env = preg_replace('/^DB_PORT=(.*)/m', 'DB_PORT='.$name, $env);
         $env = preg_replace('/^DB_USERNAME=(.+)/m', 'DB_USERNAME=root', $env);
+        $env = preg_replace('/^SESSION_DOMAIN=(.+)/m', '', $env);
 
         return $env;
     }
