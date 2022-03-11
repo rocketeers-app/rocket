@@ -42,6 +42,9 @@ class ImportRemoteDatabase
 
         $password = trim($process->getOutput());
 
+        $process = Process::fromShellCommandline("mysql -u root --password='' -e 'DROP DATABASE IF EXISTS `'".$name."'`");
+        $process->run();
+
         $process = Process::fromShellCommandline("mysql -u root --password='' -e 'CREATE DATABASE IF NOT EXISTS `'".$name."'` CHARACTER SET utf8 COLLATE utf8_general_ci'");
         $process->run();
 
