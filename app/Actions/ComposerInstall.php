@@ -11,7 +11,7 @@ class ComposerInstall
 
     public function handle($name)
     {
-        $process = Process::fromShellCommandline("cd /var/www/{$name} && composer install");
+        $process = Process::fromShellCommandline("cd /var/www/{$name} && php /usr/local/bin/composer install");
         $process->setTty(Process::isTtySupported());
         $process->setTimeout(300);
         $process->run();
