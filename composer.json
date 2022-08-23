@@ -6,16 +6,18 @@
     "type": "project",
     "license": "MIT",
     "require": {
-        "php": "^7.4",
-        "laminas/laminas-text": "^2.8.1",
-        "laravel-zero/framework": "^8.9.0",
+        "php": "^7.4|^8.0",
+        "guzzlehttp/guzzle": "^6.5.8",
+        "illuminate/http": "^8.83.23",
+        "laminas/laminas-text": "^2.9",
+        "laravel-zero/framework": "^8.10",
         "lorisleiva/laravel-actions": "^2.1.5",
-        "spatie/ssh": "^1.6.0",
-        "symfony/process": "^5.3.2"
+        "spatie/ssh": "^1.7.2",
+        "symfony/process": "^5.4.11"
     },
     "require-dev": {
-        "mockery/mockery": "^1.4.3",
-        "phpunit/phpunit": "^9.5.5"
+        "mockery/mockery": "^1.5",
+        "phpunit/phpunit": "^9.5.23"
     },
     "autoload": {
         "psr-4": {
