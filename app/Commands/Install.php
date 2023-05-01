@@ -15,18 +15,20 @@ use App\Actions\NotifyLocally;
 use App\Actions\NpmInstall;
 use App\Actions\PutEnvLocally;
 use App\Actions\RunMigrations;
+use App\Actions\ValetIsolatePhpVersion;
 use App\Actions\ValetSecure;
 use Illuminate\Console\Command;
 
 class Install extends Command
 {
-    protected $signature = 'install {site} {--server=}';
+    protected $signature = 'install {site} {--server=} {--php=8.0}';
     protected $description = 'Install site';
 
     public function handle()
     {
         $site = $this->argument('site');
         $server = $this->option('server') ?? $site;
+        $phpVersion = $this->option('php');
 
         $url = (new GetRepositoryUrl)($site, $server);
         $name = (new GetRepositoryName)($site, $server);
@@ -47,7 +49,8 @@ class Install extends Command
         (new RunMigrations)($name);
         (new NpmInstall)($name);
         (new ValetSecure)($name);
+        (new ValetIsolatePhpVersion)($name, $phpVersion);
 
-        (new NotifyLocally)($message);
+        // (new NotifyLocally)($message);
     }
 }

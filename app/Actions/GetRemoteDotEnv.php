@@ -12,7 +12,7 @@ class GetRemoteDotEnv
     public function handle($site, $server = null)
     {
         $process = Ssh::create('rocketeer', $server ?? $site)
-            ->execute("cat /var/www/{$site}/.env");
+            ->execute("sudo cat /var/www/{$site}/.env");
 
         return $process->getOutput();
     }
