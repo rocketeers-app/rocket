@@ -9,7 +9,7 @@ class GetRepositoryUrl
 {
     use AsAction;
 
-    public function handle($site, $server = null)
+    public function handle($site, $server = null): string
     {
         $process = Ssh::create('rocketeer', $server ?? $site)
             ->execute("sudo git --work-tree=/var/www/{$site}/current --git-dir=/var/www/{$site}/current/.git config --get remote.origin.url");
