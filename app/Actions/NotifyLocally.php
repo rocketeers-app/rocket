@@ -8,8 +8,8 @@ class NotifyLocally
 {
     use AsAction;
 
-    public function handle($message)
+    public function handle($message, $console)
     {
-        // $this->notify($message, 'icon.png');
+        $console->info($message);
     }
 }

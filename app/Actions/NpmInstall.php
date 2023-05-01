@@ -5,7 +5,7 @@ namespace App\Actions;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
-class NPMInstall
+class NpmInstall
 {
     use AsAction;
 
