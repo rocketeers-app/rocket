@@ -34,6 +34,8 @@ class Install extends Command
         $name = (new GetRepositoryName)($site, $server);
         $branch = (new GetCurrentBranch)($site, $server);
 
+        (new ValetIsolatePhpVersion)($name, $phpVersion);
+
         (new GitCloneRepository)($name, $url);
 
         (new CheckoutBranchLocally)($name, $branch);
@@ -49,7 +51,6 @@ class Install extends Command
         (new RunMigrations)($name);
         (new NpmInstall)($name);
         (new ValetSecure)($name);
-        (new ValetIsolatePhpVersion)($name, $phpVersion);
 
         // (new NotifyLocally)($message);
     }
