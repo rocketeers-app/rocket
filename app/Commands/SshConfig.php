@@ -37,7 +37,6 @@ class SshConfig extends Command
             $process = Process::fromShellCommandline('echo "'.$delimiter.PHP_EOL.PHP_EOL.$sshConfig.PHP_EOL.PHP_EOL.$delimiter.'" > ~/.ssh/config');
         }
 
-        $process->setTty(Process::isTtySupported());
         $process->setTimeout(300);
         $process->run();
     }

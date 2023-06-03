@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use Dotenv\Dotenv;
+use Illuminate\Support\Facades\Storage;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class SetApiToken
@@ -14,11 +15,13 @@ class SetApiToken
         if (blank(config('rocketeers.api_token'))) {
             $apiKey = $console->ask('Please provide your Rocketeers app API key');
 
-            if (! file_exists(base_path('.env'))) {
-                file_put_contents(base_path('.env'), '');
+            Storage::makeDirectory('~/.rocketeers');
+
+            if (! Storage::exists('.env')) {
+                Storage::put('.env', '');
             }
 
-            $env = collect(Dotenv::parse(file_get_contents(base_path('.env'))))
+            $env = collect(Dotenv::parse(Storage::get('.env')))
                 ->put('API_TOKEN', $apiKey)
                 ->sortKeys()
                 ->map(function ($value, $key) {
@@ -30,7 +33,7 @@ class SetApiToken
                 })
                 ->implode(PHP_EOL);
 
-            file_put_contents(base_path('.env'), $env);
+            Storage::put('.env', $env);
         }
     }
 }

@@ -15,6 +15,8 @@ $app = new LaravelZero\Framework\Application(
     dirname(__DIR__)
 );
 
+$app->useEnvironmentPath(getenv('HOME').'/.rocketeers');
+
 /*
 |--------------------------------------------------------------------------
 | Bind Important Interfaces
