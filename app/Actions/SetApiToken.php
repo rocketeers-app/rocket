@@ -11,10 +11,12 @@ class SetApiToken
 
     public function handle($console)
     {
-        if (! trim((string) env('API_TOKEN'))) {
+        if (blank(config('rocketeers.api_token'))) {
             $apiKey = $console->ask('Please provide your Rocketeers app API key');
 
-            $env = collect(Dotenv::parse(file_get_contents('.env')))
+            touch(base_path('.env'));
+
+            $env = collect(Dotenv::parse(file_get_contents(base_path('.env'))))
                 ->put('API_TOKEN', $apiKey)
                 ->sortKeys()
                 ->map(function ($value, $key) {
@@ -26,7 +28,7 @@ class SetApiToken
                 })
                 ->implode(PHP_EOL);
 
-            file_put_contents('.env', $env);
+            file_put_contents(base_path('.env'), $env);
         }
     }
 }

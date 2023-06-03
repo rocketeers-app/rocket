@@ -10,19 +10,19 @@ use Symfony\Component\Process\Process;
 
 class SshConfig extends Command
 {
-    protected $signature = 'ssh:config';
+    protected $signature = 'ssh:update';
     protected $description = 'Update your local SSH config with all sites and servers';
 
     public function handle()
     {
         (new SetApiToken)($this);
 
-        $sshConfig = (string) Http::timeout(3)
+        $sshConfig = (string) Http::timeout(5)
             ->withoutVerifying()
             ->withHeaders([
                 'Authorization' => 'Bearer '.env('API_TOKEN'),
             ])
-            ->get('https://rocketeers-app.test/api/v1/ssh/config');
+            ->get('https://rocketeers.app/api/v1/ssh/config');
 
         $delimiter = '### ROCKETEERS APP ###';
 

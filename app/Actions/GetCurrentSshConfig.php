@@ -12,7 +12,6 @@ class GetCurrentSshConfig
     public function handle(): string
     {
         $process = Process::fromShellCommandline('cat ~/.ssh/config');
-        $process->setTty(Process::isTtySupported());
         $process->run();
 
         return trim($process->getOutput());
