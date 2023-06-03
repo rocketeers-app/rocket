@@ -9,6 +9,7 @@ use Illuminate\Console\Command;
 class ImportDatabase extends Command
 {
     protected $signature = 'db:import {site} {--server=} {--user=rocketeer}';
+
     protected $description = 'Import database';
 
     public function handle()

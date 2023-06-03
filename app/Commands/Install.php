@@ -22,6 +22,7 @@ use Illuminate\Console\Command;
 class Install extends Command
 {
     protected $signature = 'install {site} {--server=} {--php=8.0}';
+
     protected $description = 'Install site';
 
     public function handle()

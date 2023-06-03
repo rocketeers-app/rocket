@@ -14,7 +14,9 @@ class SetApiToken
         if (blank(config('rocketeers.api_token'))) {
             $apiKey = $console->ask('Please provide your Rocketeers app API key');
 
-            touch(base_path('.env'));
+            if (! file_exists(base_path('.env'))) {
+                file_put_contents(base_path('.env'), '');
+            }
 
             $env = collect(Dotenv::parse(file_get_contents(base_path('.env'))))
                 ->put('API_TOKEN', $apiKey)

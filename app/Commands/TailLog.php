@@ -9,6 +9,7 @@ use Symfony\Component\Process\Process;
 class TailLog extends Command
 {
     protected $signature = 'tail:log {site} {--server=}';
+
     protected $description = 'Pull env file';
 
     public function handle()

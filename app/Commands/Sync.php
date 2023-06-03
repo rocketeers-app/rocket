@@ -17,6 +17,7 @@ use Illuminate\Console\Command;
 class Sync extends Command
 {
     protected $signature = 'sync {site} {--server=}';
+
     protected $description = 'Sync site';
 
     public function handle()

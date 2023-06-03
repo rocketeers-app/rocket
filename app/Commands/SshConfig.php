@@ -11,6 +11,7 @@ use Symfony\Component\Process\Process;
 class SshConfig extends Command
 {
     protected $signature = 'ssh:config';
+
     protected $description = 'Update your local SSH config with all sites and servers';
 
     public function handle()
@@ -29,7 +30,7 @@ class SshConfig extends Command
         $currentSshConfig = (new GetCurrentSshConfig)();
 
         if (str_contains(trim((string) $currentSshConfig), $delimiter)) {
-            $newSshConfig = preg_replace_callback('/'.$delimiter.'.*'.$delimiter.'/im', fn($matches) => $delimiter.PHP_EOL.PHP_EOL.$sshConfig.PHP_EOL.PHP_EOL.$delimiter, (string) $currentSshConfig);
+            $newSshConfig = preg_replace_callback('/'.$delimiter.'.*'.$delimiter.'/im', fn ($matches) => $delimiter.PHP_EOL.PHP_EOL.$sshConfig.PHP_EOL.PHP_EOL.$delimiter, (string) $currentSshConfig);
 
             $process = Process::fromShellCommandline('echo "'.$newSshConfig.'" > ~/.ssh/config');
         } else {

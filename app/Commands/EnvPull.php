@@ -12,6 +12,7 @@ use Illuminate\Console\Command;
 class EnvPull extends Command
 {
     protected $signature = 'env:pull {site} {--server=}';
+
     protected $description = 'Pull env for site from remote server';
 
     public function handle()
