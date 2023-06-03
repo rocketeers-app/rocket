@@ -10,7 +10,7 @@ use Symfony\Component\Process\Process;
 
 class SshConfig extends Command
 {
-    protected $signature = 'ssh:update';
+    protected $signature = 'ssh:config';
     protected $description = 'Update your local SSH config with all sites and servers';
 
     public function handle()
