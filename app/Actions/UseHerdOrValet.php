@@ -11,7 +11,7 @@ class UseHerdOrValet
 
     public function handle()
     {
-        $process = Process::fromShellCommandline('(type herd > /dev/null && echo `which herd`) || (type valet > /dev/null && echo `which valet`)');
+        $process = Process::fromShellCommandline('(type herd > /dev/null && echo "herd") || (type valet > /dev/null && echo "valet")');
         $process->setTty(Process::isTtySupported());
         $process->run();
 

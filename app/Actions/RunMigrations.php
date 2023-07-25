@@ -13,7 +13,7 @@ class RunMigrations
     {
         $herdOrValet = (new UseHerdOrValet)();
 
-        $process = Process::fromShellCommandline("cd /var/www/{$name} && {$herdOrValet} php artisan migrate --force");
+        $process = Process::fromShellCommandline(command: "{$herdOrValet} php artisan migrate --force", cwd: "cd /var/www/{$name}");
         $process->setTty(Process::isTtySupported());
         $process->setTimeout(300);
         $process->run();

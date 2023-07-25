@@ -13,7 +13,7 @@ class ComposerInstall
     {
         $herdOrValet = (new UseHerdOrValet)();
 
-        $process = Process::fromShellCommandline("cd /var/www/{$name} && {$herdOrValet} composer install");
+        $process = Process::fromShellCommandline(command: "{$herdOrValet} composer install", cwd: "cd /var/www/{$name}");
         $process->setTty(Process::isTtySupported());
         $process->setTimeout(300);
         $process->run();
