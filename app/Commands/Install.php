@@ -15,8 +15,6 @@ use App\Actions\NotifyLocally;
 use App\Actions\NpmInstall;
 use App\Actions\PutEnvLocally;
 use App\Actions\RunMigrations;
-use App\Actions\ValetIsolatePhpVersion;
-use App\Actions\ValetSecure;
 use Illuminate\Console\Command;
 
 class Install extends Command
@@ -35,7 +33,7 @@ class Install extends Command
         $name = (new GetRepositoryName)($site, $server);
         $branch = (new GetCurrentBranch)($site, $server);
 
-        (new ValetIsolatePhpVersion)($name, $phpVersion);
+        (new IsolatePhpVersion)($name, $phpVersion);
 
         (new GitCloneRepository)($name, $url);
 
@@ -51,7 +49,7 @@ class Install extends Command
         (new ComposerInstall)($name);
         (new RunMigrations)($name);
         (new NpmInstall)($name);
-        (new ValetSecure)($name);
+        (new SecureSite)($name);
 
         // (new NotifyLocally)($message);
     }

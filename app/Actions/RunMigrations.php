@@ -11,7 +11,9 @@ class RunMigrations
 
     public function handle($name)
     {
-        $process = Process::fromShellCommandline("cd /var/www/{$name} && valet php artisan migrate --force");
+        $herdOrValet = (new UseHerdOrValet)();
+
+        $process = Process::fromShellCommandline("cd /var/www/{$name} && {$herdOrValet} php artisan migrate --force");
         $process->setTty(Process::isTtySupported());
         $process->setTimeout(300);
         $process->run();

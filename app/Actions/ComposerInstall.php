@@ -11,7 +11,9 @@ class ComposerInstall
 
     public function handle($name)
     {
-        $process = Process::fromShellCommandline("cd /var/www/{$name} && valet composer install");
+        $herdOrValet = (new UseHerdOrValet)();
+
+        $process = Process::fromShellCommandline("cd /var/www/{$name} && {$herdOrValet} composer install");
         $process->setTty(Process::isTtySupported());
         $process->setTimeout(300);
         $process->run();
