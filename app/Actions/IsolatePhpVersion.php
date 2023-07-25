@@ -12,7 +12,7 @@ class IsolatePhpVersion
     public function handle($name, $phpVersion)
     {
         $herdOrValet = (new UseHerdOrValet)();
-
+        dd($herdOrValet);
         $process = Process::fromShellCommandline("cd /var/www/{$name} && {$herdOrValet} isolate php@{$phpVersion}");
         $process->setTty(Process::isTtySupported());
         $process->setTimeout(300);
