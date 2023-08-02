@@ -34,11 +34,11 @@ class Install extends Command
         $name = (new GetRepositoryName)($site, $server);
         $branch = (new GetCurrentBranch)($site, $server);
 
-        (new IsolatePhpVersion)($name, $phpVersion);
-
         (new GitCloneRepository)($name, $url);
 
         (new CheckoutBranchLocally)($name, $branch);
+
+        (new IsolatePhpVersion)($name, $phpVersion);
 
         $env = (new GetRemoteDotEnv)($site, $server);
         $env = (new ConfigureDotEnvLocally)($env, $name);
