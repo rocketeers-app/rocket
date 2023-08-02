@@ -16,6 +16,7 @@ use App\Actions\NotifyLocally;
 use App\Actions\NpmInstall;
 use App\Actions\PutEnvLocally;
 use App\Actions\RunMigrations;
+use App\Actions\SecureSite;
 use Illuminate\Console\Command;
 
 class Install extends Command

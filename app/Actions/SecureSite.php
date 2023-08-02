@@ -11,7 +11,9 @@ class SecureSite
 
     public function handle($name)
     {
-        $process = Process::fromShellCommandline("cd /var/www/{$name} && valet secure {$name}");
+        $herdOrValet = (new UseHerdOrValet)();
+
+        $process = Process::fromShellCommandline(command: "{$herdOrValet} secure {$name}", cwd: "/var/www/{$name}");
         $process->setTty(Process::isTtySupported());
         $process->setTimeout(300);
         $process->run();
