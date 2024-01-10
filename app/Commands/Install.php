@@ -32,11 +32,11 @@ class Install extends Command
         $server = $this->option('server') ?? $site;
         $phpVersion = $this->option('php');
 
-        (new ChangeWorkingDirectory)($name);
-
         $url = (new GetRepositoryUrl)($site, $server);
         $name = (new GetRepositoryName)($site, $server);
         $branch = (new GetCurrentBranch)($site, $server);
+
+        (new ChangeWorkingDirectory)($name);
 
         (new GitCloneRepository)($name, $url);
 
