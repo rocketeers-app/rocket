@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Actions\ChangeWorkingDirectory;
 use App\Actions\CheckoutBranchLocally;
 use App\Actions\ComposerInstall;
 use App\Actions\ConfigureDotEnvLocally;
@@ -30,6 +31,8 @@ class Install extends Command
         $site = $this->argument('site');
         $server = $this->option('server') ?? $site;
         $phpVersion = $this->option('php');
+
+        (new ChangeWorkingDirectory)($name);
 
         $url = (new GetRepositoryUrl)($site, $server);
         $name = (new GetRepositoryName)($site, $server);
