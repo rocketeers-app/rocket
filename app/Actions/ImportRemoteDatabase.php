@@ -42,6 +42,12 @@ class ImportRemoteDatabase
 
         $password = trim($process->getOutput());
 
+        $process = Symfony\Component\Process\Process::fromShellCommandline(
+            'mysql -u root --password="" -e "SET @@global.time_zone=\'+00:00\'"'
+        );
+
+        $process->run();
+
         $process = Process::fromShellCommandline("mysql -u root --password='' -e 'DROP DATABASE IF EXISTS `'".$name."'`");
         $process->run();
 
