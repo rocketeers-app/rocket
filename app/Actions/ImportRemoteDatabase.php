@@ -53,8 +53,8 @@ class ImportRemoteDatabase
     public function importDatabase(array $credentials, string $server): void
     {
         $process = Process::fromShellCommandline(
-            'ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o ServerAliveInterval=60 rocketeer@'.$server
-            .' "sudo mysqldump --max-allowed-packet=512M --host=\''.$credentials['DB_HOST'].'\' --user=\''.$credentials['DB_USERNAME'].'\' --password=\''.$credentials['DB_PASSWORD'].'\' --no-tablespaces --single-transaction \''.$credentials['DB_DATABASE'].'\' 2>/dev/null | sudo gzip"'
+            'set -o pipefail; ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o ServerAliveInterval=60 rocketeer@'.$server
+            .' "sudo mysqldump --max-allowed-packet=512M --host=\''.$credentials['DB_HOST'].'\' --user=\''.$credentials['DB_USERNAME'].'\' --password=\''.$credentials['DB_PASSWORD'].'\' --no-tablespaces --single-transaction \''.$credentials['DB_DATABASE'].'\' | sudo gzip"'
             .' | gunzip'
             .' | mysql --max-allowed-packet=512M --user=root --password= --init-command="SET FOREIGN_KEY_CHECKS=0;" '.$credentials['name']
         );
