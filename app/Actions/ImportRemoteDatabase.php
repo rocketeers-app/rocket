@@ -19,10 +19,27 @@ class ImportRemoteDatabase
 
     public function fetchCredentials($site, $server): array
     {
-        $name = (new GetRepositoryName)($site, $server);
+        $isWordPress = (new IsWordPress)($site, $server);
 
-        $envVars = ['DB_HOST', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD'];
+        $name = $isWordPress
+            ? $site
+            : (new GetRepositoryName)($site, $server);
+
         $credentials = ['name' => $name];
+
+        if ($isWordPress) {
+            $credentials = array_merge($credentials, $this->fetchWordPressCredentials($site, $server));
+        } else {
+            $credentials = array_merge($credentials, $this->fetchEnvCredentials($site, $server));
+        }
+
+        return $credentials;
+    }
+
+    protected function fetchEnvCredentials($site, $server): array
+    {
+        $envVars = ['DB_HOST', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD'];
+        $credentials = [];
 
         foreach ($envVars as $var) {
             $process = (new CreateSshConnection)($server)
@@ -37,6 +54,35 @@ class ImportRemoteDatabase
             }
 
             $credentials[$var] = $value;
+        }
+
+        return $credentials;
+    }
+
+    protected function fetchWordPressCredentials($site, $server): array
+    {
+        $wpConfigVars = [
+            'DB_HOST' => 'DB_HOST',
+            'DB_DATABASE' => 'DB_NAME',
+            'DB_USERNAME' => 'DB_USER',
+            'DB_PASSWORD' => 'DB_PASSWORD',
+        ];
+
+        $credentials = [];
+
+        foreach ($wpConfigVars as $key => $wpKey) {
+            $process = (new CreateSshConnection)($server)
+                ->execute([
+                    "sudo grep \"define.*'{$wpKey}'\" /var/www/{$site}/current/wp-config.php /var/www/{$site}/current/public/wp-config.php 2>/dev/null | head -1 | sed \"s/.*'[^']*'[^']*'\\([^']*\\)'.*/\\1/\"",
+                ]);
+
+            $value = trim($process->getOutput());
+
+            if (empty($value) && $key !== 'DB_PASSWORD') {
+                throw new StepException("Could not fetch {$wpKey} from remote wp-config.php.");
+            }
+
+            $credentials[$key] = $value;
         }
 
         return $credentials;
