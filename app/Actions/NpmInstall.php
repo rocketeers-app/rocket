@@ -11,7 +11,7 @@ class NpmInstall
 
     public function handle($name)
     {
-        $process = Process::fromShellCommandline("cd /var/www/{$name} && nvm use && npm install && npm run dev");
+        $process = Process::fromShellCommandline(command: "nvm use && npm install && npm run dev", cwd: "/var/www/{$name}");
         $process->setTimeout(300);
         $process->run();
     }

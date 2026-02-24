@@ -22,19 +22,13 @@ class ImportDatabase extends Command
 
         $action = new ImportRemoteDatabase;
 
-        $this->registerSteps([
-            'Fetching remote credentials' => function () use ($action, $site, $server) {
-                return $action->fetchCredentials($site, $server);
-            },
-            'Preparing local database' => function ($results) use ($action) {
-                $action->prepareLocalDatabase($results['Fetching remote credentials']['name']);
-            },
-            'Importing remote database' => function ($results) use ($action, $server) {
-                $action->importDatabase($results['Fetching remote credentials'], $server);
-            },
-        ]);
+        $this->startProgress(3);
 
-        $this->runSteps();
+        $credentials = $this->step('Fetching remote credentials', fn () => $action->fetchCredentials($site, $server));
+        $this->step('Preparing local database', fn () => $action->prepareLocalDatabase($credentials['name']));
+        $this->step('Importing remote database', fn () => $action->importDatabase($credentials, $server));
+
+        $this->finishProgress();
 
         (new NotifyLocally)("Database is imported for {$site}", $this);
     }

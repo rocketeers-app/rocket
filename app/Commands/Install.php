@@ -12,9 +12,11 @@ use App\Actions\GetRepositoryName;
 use App\Actions\GetRepositoryUrl;
 use App\Actions\GitCloneRepository;
 use App\Actions\ImportRemoteDatabase;
+use App\Actions\IsWordPress;
 use App\Actions\IsolatePhpVersion;
 use App\Actions\NpmInstall;
 use App\Actions\PutEnvLocally;
+use App\Actions\RsyncSite;
 use App\Actions\RunMigrations;
 use App\Actions\SecureSite;
 use App\Commands\Concerns\WithSteps;
@@ -33,48 +35,40 @@ class Install extends Command
         $site = $this->argument('site');
         $server = $this->option('server') ?? $site;
         $phpVersion = $this->option('php');
+
+        if ((new IsWordPress)($site, $server)) {
+            return $this->call('sync', [
+                'site' => $site,
+                '--server' => $server,
+            ]);
+        }
+
+        $this->startProgress(14);
+
+        $url = $this->step('Fetching repository URL', fn () => (new GetRepositoryUrl)($site, $server));
+        $name = $this->step('Fetching repository name', fn () => (new GetRepositoryName)($site, $server));
+        $branch = $this->step('Fetching current branch', fn () => (new GetCurrentBranch)($site, $server));
+
+        (new ChangeWorkingDirectory)($name);
+
+        $this->step('Cloning repository', fn () => (new GitCloneRepository)($name, $url));
+        $this->step('Checking out branch', fn () => (new CheckoutBranchLocally)($name, $branch));
+        $this->step('Isolating PHP version', fn () => (new IsolatePhpVersion)($name, $phpVersion));
+
+        $env = $this->step('Fetching remote .env', fn () => (new GetRemoteDotEnv)($site, $server));
+        $env = (new ConfigureDotEnvLocally)($env, $name);
+        (new PutEnvLocally)($env, $name);
+
         $importAction = new ImportRemoteDatabase;
+        $credentials = $this->step('Fetching database credentials', fn () => $importAction->fetchCredentials($site, $server));
+        $this->step('Preparing local database', fn () => $importAction->prepareLocalDatabase($credentials['name']));
+        $this->step('Importing remote database', fn () => $importAction->importDatabase($credentials, $server));
 
-        $this->registerSteps([
-            'Fetching repository URL' => fn () => (new GetRepositoryUrl)($site, $server),
-            'Fetching repository name' => fn () => (new GetRepositoryName)($site, $server),
-            'Fetching current branch' => fn () => (new GetCurrentBranch)($site, $server),
-            'Cloning repository' => function ($results) {
-                (new ChangeWorkingDirectory)($results['Fetching repository name']);
-                (new GitCloneRepository)($results['Fetching repository name'], $results['Fetching repository URL']);
-            },
-            'Checking out branch' => function ($results) {
-                (new CheckoutBranchLocally)($results['Fetching repository name'], $results['Fetching current branch']);
-            },
-            'Isolating PHP version' => function ($results) use ($phpVersion) {
-                (new IsolatePhpVersion)($results['Fetching repository name'], $phpVersion);
-            },
-            'Configuring .env' => function ($results) use ($site, $server) {
-                $env = (new GetRemoteDotEnv)($site, $server);
-                $env = (new ConfigureDotEnvLocally)($env, $results['Fetching repository name']);
-                (new PutEnvLocally)($env, $results['Fetching repository name']);
-            },
-            'Fetching database credentials' => fn () => $importAction->fetchCredentials($site, $server),
-            'Preparing local database' => function ($results) use ($importAction) {
-                $importAction->prepareLocalDatabase($results['Fetching database credentials']['name']);
-            },
-            'Importing remote database' => function ($results) use ($importAction, $server) {
-                $importAction->importDatabase($results['Fetching database credentials'], $server);
-            },
-            'Running composer install' => function ($results) {
-                (new ComposerInstall)($results['Fetching repository name']);
-            },
-            'Running migrations' => function ($results) {
-                (new RunMigrations)($results['Fetching repository name']);
-            },
-            'Running npm install' => function ($results) {
-                (new NpmInstall)($results['Fetching repository name']);
-            },
-            'Securing site' => function ($results) {
-                (new SecureSite)($results['Fetching repository name']);
-            },
-        ]);
+        $this->step('Running composer install', fn () => (new ComposerInstall)($name));
+        $this->step('Running migrations', fn () => (new RunMigrations)($name));
+        $this->step('Running npm install', fn () => (new NpmInstall)($name));
+        $this->step('Securing site', fn () => (new SecureSite)($name));
 
-        $this->runSteps();
+        $this->finishProgress();
     }
 }

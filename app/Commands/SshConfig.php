@@ -4,12 +4,15 @@ namespace App\Commands;
 
 use App\Actions\GetCurrentSshConfig;
 use App\Actions\SetApiToken;
+use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Symfony\Component\Process\Process;
 
 class SshConfig extends Command
 {
+    use WithSteps;
+
     protected $signature = 'ssh:config';
 
     protected $description = 'Update your local SSH config with all sites and servers';
@@ -18,26 +21,31 @@ class SshConfig extends Command
     {
         (new SetApiToken)($this);
 
-        $sshConfig = (string) Http::timeout(5)
+        $this->startProgress(2);
+
+        $sshConfig = $this->step('Fetching SSH config', fn () => (string) Http::timeout(5)
             ->withoutVerifying()
             ->withHeaders([
                 'Authorization' => 'Bearer '.env('API_TOKEN'),
             ])
-            ->get('https://rocketeers.app/api/v1/ssh/config');
+            ->get('https://rocketeers.app/api/v1/ssh/config'));
 
-        $delimiter = '### ROCKETEERS APP ###';
+        $this->step('Updating local SSH config', function () use ($sshConfig) {
+            $delimiter = '### ROCKETEERS APP ###';
+            $currentSshConfig = (new GetCurrentSshConfig)();
 
-        $currentSshConfig = (new GetCurrentSshConfig)();
+            if (str_contains(trim((string) $currentSshConfig), $delimiter)) {
+                $newSshConfig = preg_replace_callback('/'.$delimiter.'.*'.$delimiter.'/im', fn ($matches) => $delimiter.PHP_EOL.PHP_EOL.$sshConfig.PHP_EOL.PHP_EOL.$delimiter, (string) $currentSshConfig);
 
-        if (str_contains(trim((string) $currentSshConfig), $delimiter)) {
-            $newSshConfig = preg_replace_callback('/'.$delimiter.'.*'.$delimiter.'/im', fn ($matches) => $delimiter.PHP_EOL.PHP_EOL.$sshConfig.PHP_EOL.PHP_EOL.$delimiter, (string) $currentSshConfig);
+                $process = Process::fromShellCommandline('echo "'.$newSshConfig.'" > ~/.ssh/config');
+            } else {
+                $process = Process::fromShellCommandline('echo "'.$delimiter.PHP_EOL.PHP_EOL.$sshConfig.PHP_EOL.PHP_EOL.$delimiter.'" > ~/.ssh/config');
+            }
 
-            $process = Process::fromShellCommandline('echo "'.$newSshConfig.'" > ~/.ssh/config');
-        } else {
-            $process = Process::fromShellCommandline('echo "'.$delimiter.PHP_EOL.PHP_EOL.$sshConfig.PHP_EOL.PHP_EOL.$delimiter.'" > ~/.ssh/config');
-        }
+            $process->setTimeout(300);
+            $process->run();
+        });
 
-        $process->setTimeout(300);
-        $process->run();
+        $this->finishProgress();
     }
 }

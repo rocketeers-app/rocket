@@ -3,7 +3,6 @@
 namespace App\Actions;
 
 use Lorisleiva\Actions\Concerns\AsAction;
-use Symfony\Component\Process\Process;
 
 class ChangeWorkingDirectory
 {
@@ -11,7 +10,6 @@ class ChangeWorkingDirectory
 
     public function handle($name)
     {
-        $process = Process::fromShellCommandline(command: "cd /var/www/{$name}");
-        $process->run();
+        chdir("/var/www/{$name}");
     }
 }
