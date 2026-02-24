@@ -12,7 +12,6 @@ class CheckoutBranchLocally
     public function handle($name, $branch)
     {
         $process = Process::fromShellCommandline(command: "git checkout {$branch}", cwd: "/var/www/{$name}");
-        $process->setTty(Process::isTtySupported());
         $process->run();
     }
 }

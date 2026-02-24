@@ -11,8 +11,7 @@ class ChangeWorkingDirectory
 
     public function handle($name)
     {
-        $process = Process::fromShellCommandline(command: "cwd /var/www/{$name}");
-        $process->setTty(Process::isTtySupported());
+        $process = Process::fromShellCommandline(command: "cd /var/www/{$name}");
         $process->run();
     }
 }

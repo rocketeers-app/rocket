@@ -12,7 +12,6 @@ class GitCloneRepository
     public function handle($name, $url)
     {
         $process = new Process(['git', 'clone', $url, '/var/www/'.$name]);
-        $process->setTty(Process::isTtySupported());
         $process->setTimeout(300);
         $process->run();
     }

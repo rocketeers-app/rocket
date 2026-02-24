@@ -15,7 +15,6 @@ class IsolatePhpVersion
 
         $process = Process::fromShellCommandline(command: "{$herdOrValet} isolate php@{$phpVersion}", cwd: "/var/www/{$name}");
 
-        $process->setTty(Process::isTtySupported());
         $process->setTimeout(300);
         $process->run();
     }
