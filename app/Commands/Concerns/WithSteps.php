@@ -2,16 +2,43 @@
 
 namespace App\Commands\Concerns;
 
-use function Laravel\Prompts\spin;
+use Symfony\Component\Console\Helper\ProgressBar;
 
 trait WithSteps
 {
-    protected function step(string $message, callable $callback): mixed
+    protected ?ProgressBar $progressBar = null;
+
+    protected array $steps = [];
+
+    protected function registerSteps(array $steps): void
     {
-        $result = spin($callback, $message.'...');
+        $this->steps = $steps;
 
-        $this->line("  <info>✓</info> {$message}");
+        ProgressBar::setFormatDefinition('custom', ' %current%/%max% [%bar%] %message%');
 
-        return $result;
+        $this->progressBar = $this->output->createProgressBar(count($steps));
+        $this->progressBar->setFormat('custom');
+        $this->progressBar->setMessage('Starting...');
+        $this->progressBar->start();
+    }
+
+    protected function runSteps(): array
+    {
+        $results = [];
+
+        foreach ($this->steps as $message => $callback) {
+            $this->progressBar->setMessage($message.'...');
+            $this->progressBar->display();
+
+            $results[$message] = $callback($results);
+
+            $this->progressBar->advance();
+        }
+
+        $this->progressBar->setMessage('Done!');
+        $this->progressBar->finish();
+        $this->newLine();
+
+        return $results;
     }
 }
