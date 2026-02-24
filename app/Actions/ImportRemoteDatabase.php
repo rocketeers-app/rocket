@@ -12,55 +12,54 @@ class ImportRemoteDatabase
 
     public function handle($site, $server = null)
     {
+        $credentials = $this->fetchCredentials($site, $server);
+        $this->prepareLocalDatabase($credentials['name']);
+        $this->importDatabase($credentials, $server);
+    }
+
+    public function fetchCredentials($site, $server): array
+    {
         $name = (new GetRepositoryName)($site, $server);
 
-        $process = Ssh::create('rocketeer', $server)
-            ->execute([
-                'sudo grep DB_HOST /var/www/'.$site."/current/.env | grep -v -e '^\s*#' | cut -d '=' -f 2-",
-            ]);
+        $envVars = ['DB_HOST', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD'];
+        $credentials = ['name' => $name];
 
-        $host = trim($process->getOutput());
+        foreach ($envVars as $var) {
+            $process = Ssh::create('rocketeer', $server)
+                ->disableStrictHostKeyChecking()
+                ->execute([
+                    'sudo grep '.$var.' /var/www/'.$site."/current/.env | grep -v -e '^\s*#' | cut -d '=' -f 2-",
+                ]);
 
-        $process = Ssh::create('rocketeer', $server)
-            ->execute([
-                'sudo grep DB_DATABASE /var/www/'.$site."/current/.env | grep -v -e '^\s*#' | cut -d '=' -f 2-",
-            ]);
+            $credentials[$var] = trim($process->getOutput());
+        }
 
-        $database = trim($process->getOutput());
+        return $credentials;
+    }
 
-        $process = Ssh::create('rocketeer', $server)
-            ->execute([
-                'sudo grep DB_USERNAME /var/www/'.$site."/current/.env | grep -v -e '^\s*#' | cut -d '=' -f 2-",
-            ]);
+    public function prepareLocalDatabase(string $name): void
+    {
+        Process::fromShellCommandline(
+            'mysql -u root --password="" -e "SET @@global.time_zone=\'+00:00\'" 2>/dev/null'
+        )->run();
 
-        $username = trim($process->getOutput());
+        Process::fromShellCommandline(
+            "mysql -u root --password='' -e 'DROP DATABASE IF EXISTS `".$name."`' 2>/dev/null"
+        )->run();
 
-        $process = Ssh::create('rocketeer', $server)
-            ->execute([
-                'sudo grep DB_PASSWORD /var/www/'.$site."/current/.env | grep -v -e '^\s*#' | cut -d '=' -f 2-",
-            ]);
+        Process::fromShellCommandline(
+            "mysql -u root --password='' -e 'CREATE DATABASE IF NOT EXISTS `".$name."` CHARACTER SET utf8 COLLATE utf8_general_ci' 2>/dev/null"
+        )->run();
+    }
 
-        $password = trim($process->getOutput());
-
+    public function importDatabase(array $credentials, string $server): void
+    {
         $process = Process::fromShellCommandline(
-            'mysql -u root --password="" -e "SET @@global.time_zone=\'+00:00\'"'
-        );
-
-        $process->run();
-
-        $process = Process::fromShellCommandline("mysql -u root --password='' -e 'DROP DATABASE IF EXISTS `'".$name."'`");
-        $process->run();
-
-        $process = Process::fromShellCommandline("mysql -u root --password='' -e 'CREATE DATABASE IF NOT EXISTS `'".$name."'` CHARACTER SET utf8 COLLATE utf8_general_ci'");
-        $process->run();
-
-        $process = Process::fromShellCommandline(
-            'ssh -o ServerAliveInterval=60 rocketeer@'.$server
-            .' "sudo mysqldump --max-allowed-packet=512M --host=\''.$host.'\' --user=\''.$username.'\' --password=\''.$password.'\' --no-tablespaces --single-transaction \''.$database.'\' | sudo gzip"'
+            'ssh -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=60 rocketeer@'.$server
+            .' "sudo mysqldump --max-allowed-packet=512M --host=\''.$credentials['DB_HOST'].'\' --user=\''.$credentials['DB_USERNAME'].'\' --password=\''.$credentials['DB_PASSWORD'].'\' --no-tablespaces --single-transaction \''.$credentials['DB_DATABASE'].'\' 2>/dev/null | sudo gzip"'
             .' | gunzip'
-            .' | mysql --max-allowed-packet=512M --user=root --password= --init-command="SET FOREIGN_KEY_CHECKS=0;" '.$name
+            .' | mysql --max-allowed-packet=512M --user=root --password= --init-command="SET FOREIGN_KEY_CHECKS=0;" '.$credentials['name'].' 2>/dev/null'
         );
-        $process->setTty(Process::isTtySupported());
         $process->setTimeout(3600);
         $process->run();
     }
