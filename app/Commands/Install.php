@@ -17,12 +17,13 @@ use App\Actions\NpmInstall;
 use App\Actions\PutEnvLocally;
 use App\Actions\RunMigrations;
 use App\Actions\SecureSite;
+use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
-
-use function Laravel\Prompts\spin;
 
 class Install extends Command
 {
+    use WithSteps;
+
     protected $signature = 'install {site} {--server=} {--php=8.0}';
 
     protected $description = 'Install site';
@@ -33,82 +34,28 @@ class Install extends Command
         $server = $this->option('server') ?? $site;
         $phpVersion = $this->option('php');
 
-        $url = spin(
-            fn () => (new GetRepositoryUrl)($site, $server),
-            'Fetching repository URL...'
-        );
-
-        $name = spin(
-            fn () => (new GetRepositoryName)($site, $server),
-            'Fetching repository name...'
-        );
-
-        $branch = spin(
-            fn () => (new GetCurrentBranch)($site, $server),
-            'Fetching current branch...'
-        );
+        $url = $this->step('Fetching repository URL', fn () => (new GetRepositoryUrl)($site, $server));
+        $name = $this->step('Fetching repository name', fn () => (new GetRepositoryName)($site, $server));
+        $branch = $this->step('Fetching current branch', fn () => (new GetCurrentBranch)($site, $server));
 
         (new ChangeWorkingDirectory)($name);
 
-        spin(
-            fn () => (new GitCloneRepository)($name, $url),
-            'Cloning repository...'
-        );
+        $this->step('Cloning repository', fn () => (new GitCloneRepository)($name, $url));
+        $this->step('Checking out branch', fn () => (new CheckoutBranchLocally)($name, $branch));
+        $this->step('Isolating PHP version', fn () => (new IsolatePhpVersion)($name, $phpVersion));
 
-        spin(
-            fn () => (new CheckoutBranchLocally)($name, $branch),
-            'Checking out branch...'
-        );
-
-        spin(
-            fn () => (new IsolatePhpVersion)($name, $phpVersion),
-            'Isolating PHP version...'
-        );
-
-        $env = spin(
-            fn () => (new GetRemoteDotEnv)($site, $server),
-            'Fetching remote .env...'
-        );
-
+        $env = $this->step('Fetching remote .env', fn () => (new GetRemoteDotEnv)($site, $server));
         $env = (new ConfigureDotEnvLocally)($env, $name);
-
         (new PutEnvLocally)($env, $name);
 
         $importAction = new ImportRemoteDatabase;
+        $credentials = $this->step('Fetching database credentials', fn () => $importAction->fetchCredentials($site, $server));
+        $this->step('Preparing local database', fn () => $importAction->prepareLocalDatabase($credentials['name']));
+        $this->step('Importing remote database', fn () => $importAction->importDatabase($credentials, $server));
 
-        $credentials = spin(
-            fn () => $importAction->fetchCredentials($site, $server),
-            'Fetching database credentials...'
-        );
-
-        spin(
-            fn () => $importAction->prepareLocalDatabase($credentials['name']),
-            'Preparing local database...'
-        );
-
-        spin(
-            fn () => $importAction->importDatabase($credentials, $server),
-            'Importing remote database...'
-        );
-
-        spin(
-            fn () => (new ComposerInstall)($name),
-            'Running composer install...'
-        );
-
-        spin(
-            fn () => (new RunMigrations)($name),
-            'Running migrations...'
-        );
-
-        spin(
-            fn () => (new NpmInstall)($name),
-            'Running npm install...'
-        );
-
-        spin(
-            fn () => (new SecureSite)($name),
-            'Securing site...'
-        );
+        $this->step('Running composer install', fn () => (new ComposerInstall)($name));
+        $this->step('Running migrations', fn () => (new RunMigrations)($name));
+        $this->step('Running npm install', fn () => (new NpmInstall)($name));
+        $this->step('Securing site', fn () => (new SecureSite)($name));
     }
 }

@@ -4,12 +4,13 @@ namespace App\Commands;
 
 use App\Actions\ImportRemoteDatabase;
 use App\Actions\NotifyLocally;
+use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
-
-use function Laravel\Prompts\spin;
 
 class ImportDatabase extends Command
 {
+    use WithSteps;
+
     protected $signature = 'db:import {site} {--server=} {--user=rocketeer}';
 
     protected $description = 'Import database';
@@ -21,20 +22,9 @@ class ImportDatabase extends Command
 
         $action = new ImportRemoteDatabase;
 
-        $credentials = spin(
-            fn () => $action->fetchCredentials($site, $server),
-            'Fetching remote credentials...'
-        );
-
-        spin(
-            fn () => $action->prepareLocalDatabase($credentials['name']),
-            'Preparing local database...'
-        );
-
-        spin(
-            fn () => $action->importDatabase($credentials, $server),
-            'Importing remote database...'
-        );
+        $credentials = $this->step('Fetching remote credentials', fn () => $action->fetchCredentials($site, $server));
+        $this->step('Preparing local database', fn () => $action->prepareLocalDatabase($credentials['name']));
+        $this->step('Importing remote database', fn () => $action->importDatabase($credentials, $server));
 
         (new NotifyLocally)("Database is imported for {$site}", $this);
     }
