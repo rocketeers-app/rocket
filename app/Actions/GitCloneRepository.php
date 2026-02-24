@@ -12,6 +12,10 @@ class GitCloneRepository
 
     public function handle($name, $url)
     {
+        if (is_dir("/var/www/{$name}/.git")) {
+            return;
+        }
+
         $process = new Process(['git', 'clone', $url, '/var/www/'.$name]);
         $process->setTimeout(300);
         $process->run();
