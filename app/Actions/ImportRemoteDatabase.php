@@ -54,7 +54,12 @@ class ImportRemoteDatabase
         $process = Process::fromShellCommandline("mysql -u root --password='' -e 'CREATE DATABASE IF NOT EXISTS `'".$name."'` CHARACTER SET utf8 COLLATE utf8_general_ci'");
         $process->run();
 
-        $process = Process::fromShellCommandline('ssh -o ServerAliveInterval=60 rocketeer@'.$server.' "sudo mysqldump --max-allowed-packet=512M --host=\''.$host.'\' --user=\''.$username.'\' --password=\''.$password.'\' --no-tablespaces --single-transaction \''.$database.'\' | sudo gzip" | gunzip | mysql --max-allowed-packet=512M --user root --password=\'\' --init-command=\"SET FOREIGN_KEY_CHECKS=0;\" \''.$name.'\'');
+        $process = Process::fromShellCommandline(
+            'ssh -o ServerAliveInterval=60 rocketeer@'.$server
+            .' "sudo mysqldump --max-allowed-packet=512M --host=\''.$host.'\' --user=\''.$username.'\' --password=\''.$password.'\' --no-tablespaces --single-transaction \''.$database.'\' | sudo gzip"'
+            .' | gunzip'
+            .' | mysql --max-allowed-packet=512M --user=root --password= --init-command="SET FOREIGN_KEY_CHECKS=0;" '.$name
+        );
         $process->setTty(Process::isTtySupported());
         $process->setTimeout(3600);
         $process->run();
