@@ -2,8 +2,8 @@
 
 namespace App\Commands;
 
+use App\Actions\CreateSshConnection;
 use Illuminate\Console\Command;
-use Spatie\Ssh\Ssh;
 use Symfony\Component\Process\Process;
 
 use function Laravel\Prompts\select;
@@ -19,8 +19,7 @@ class TailLog extends Command
         $site = $this->argument('site');
         $server = $this->option('server') ?? $site;
 
-        $process = Ssh::create('rocketeer', $server)
-            ->disableStrictHostKeyChecking()
+        $process = (new CreateSshConnection)($server)
             ->execute("find /var/www/{$site}/persistent/storage/logs /var/www/{$site}/logs -type f -name '*.log' 2>/dev/null | sort -r");
 
         $output = trim($process->getOutput());
@@ -65,8 +64,7 @@ class TailLog extends Command
 
         $this->info('Tailing '.basename($selected).'...');
 
-        Ssh::create('rocketeer', $server)
-            ->disableStrictHostKeyChecking()
+        (new CreateSshConnection)($server)
             ->configureProcess(fn (Process $process) => $process->setTty(true))
             ->onOutput(fn ($type, $line) => $this->output->write($line))
             ->execute("tail -f {$selected}");

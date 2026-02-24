@@ -3,7 +3,6 @@
 namespace App\Actions;
 
 use Lorisleiva\Actions\Concerns\AsAction;
-use Spatie\Ssh\Ssh;
 
 class GetRemoteDotEnv
 {
@@ -11,7 +10,7 @@ class GetRemoteDotEnv
 
     public function handle($site, $server = null)
     {
-        $process = Ssh::create('rocketeer', $server ?? $site)
+        $process = (new CreateSshConnection)($server ?? $site)
             ->execute("sudo cat /var/www/{$site}/.env");
 
         return $process->getOutput();

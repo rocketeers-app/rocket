@@ -3,7 +3,6 @@
 namespace App\Actions;
 
 use Lorisleiva\Actions\Concerns\AsAction;
-use Spatie\Ssh\Ssh;
 
 class GetCurrentBranch
 {
@@ -11,7 +10,7 @@ class GetCurrentBranch
 
     public function handle($site, $server = null): string
     {
-        $process = Ssh::create('rocketeer', $server ?? $site)
+        $process = (new CreateSshConnection)($server ?? $site)
             ->execute("sudo git --work-tree=/var/www/{$site}/current --git-dir=/var/www/{$site}/current/.git rev-parse --abbrev-ref HEAD");
 
         return trim($process->getOutput());

@@ -3,7 +3,6 @@
 namespace App\Actions;
 
 use Lorisleiva\Actions\Concerns\AsAction;
-use Spatie\Ssh\Ssh;
 
 class IsWordPress
 {
@@ -11,8 +10,7 @@ class IsWordPress
 
     public function handle($site, $server): bool
     {
-        $process = Ssh::create('rocketeer', $server)
-            ->disableStrictHostKeyChecking()
+        $process = (new CreateSshConnection)($server)
             ->execute([
                 'test -f /var/www/'.$site.'/current/wp-config.php -o -f /var/www/'.$site.'/current/public/wp-config.php && echo "yes" || echo "no"',
             ]);
