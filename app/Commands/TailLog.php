@@ -12,7 +12,7 @@ class TailLog extends Command
 {
     protected $signature = 'tail {site} {--server=}';
 
-    protected $description = 'Tail a Laravel log file on the remote server';
+    protected $description = 'Tail a log file on the remote server';
 
     public function handle()
     {
@@ -21,7 +21,7 @@ class TailLog extends Command
 
         $process = Ssh::create('rocketeer', $server)
             ->disableStrictHostKeyChecking()
-            ->execute("ls -t /var/www/{$site}/persistent/storage/logs/laravel-* 2>/dev/null");
+            ->execute("ls -t /var/www/{$site}/persistent/storage/logs/laravel-* /var/www/{$site}/logs/* 2>/dev/null");
 
         $output = trim($process->getOutput());
 
