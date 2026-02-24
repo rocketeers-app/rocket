@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Exceptions\StepException;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
@@ -14,8 +15,11 @@ class IsolatePhpVersion
         $herdOrValet = (new UseHerdOrValet)();
 
         $process = Process::fromShellCommandline(command: "{$herdOrValet} isolate php@{$phpVersion}", cwd: "/var/www/{$name}");
-
         $process->setTimeout(300);
         $process->run();
+
+        if (! $process->isSuccessful()) {
+            throw new StepException("Could not isolate PHP {$phpVersion}: ".trim($process->getErrorOutput()));
+        }
     }
 }

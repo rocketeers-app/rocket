@@ -2,14 +2,13 @@
 
 namespace App\Actions;
 
+use App\Exceptions\StepException;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
 class ImportRemoteDatabase
 {
     use AsAction;
-
-    protected string $error = '';
 
     public function handle($site, $server = null)
     {
@@ -31,7 +30,13 @@ class ImportRemoteDatabase
                     'sudo grep "^'.$var.'=" /var/www/'.$site."/current/.env | grep -v -e '^\s*#' | cut -d '=' -f 2-",
                 ]);
 
-            $credentials[$var] = trim($process->getOutput());
+            $value = trim($process->getOutput());
+
+            if (empty($value) && $var !== 'DB_PASSWORD') {
+                throw new StepException("Could not fetch {$var} from remote .env.");
+            }
+
+            $credentials[$var] = $value;
         }
 
         return $credentials;
@@ -47,12 +52,17 @@ class ImportRemoteDatabase
             "mysql -u root --password='' -e 'DROP DATABASE IF EXISTS `".$name."`' 2>/dev/null"
         )->run();
 
-        Process::fromShellCommandline(
+        $process = Process::fromShellCommandline(
             "mysql -u root --password='' -e 'CREATE DATABASE IF NOT EXISTS `".$name."` CHARACTER SET utf8 COLLATE utf8_general_ci' 2>/dev/null"
-        )->run();
+        );
+        $process->run();
+
+        if (! $process->isSuccessful()) {
+            throw new StepException('Could not create local database: '.trim($process->getErrorOutput()));
+        }
     }
 
-    public function importDatabase(array $credentials, string $server): bool
+    public function importDatabase(array $credentials, string $server): void
     {
         $process = Process::fromShellCommandline(
             'set -o pipefail; ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o ServerAliveInterval=60 rocketeer@'.$server
@@ -63,13 +73,8 @@ class ImportRemoteDatabase
         $process->setTimeout(3600);
         $process->run();
 
-        $this->error = trim($process->getErrorOutput());
-
-        return $process->isSuccessful();
-    }
-
-    public function getError(): string
-    {
-        return $this->error;
+        if (! $process->isSuccessful()) {
+            throw new StepException('Database import failed: '.trim($process->getErrorOutput()));
+        }
     }
 }

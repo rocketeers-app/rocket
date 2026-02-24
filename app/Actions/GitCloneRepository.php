@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Exceptions\StepException;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
@@ -14,5 +15,9 @@ class GitCloneRepository
         $process = new Process(['git', 'clone', $url, '/var/www/'.$name]);
         $process->setTimeout(300);
         $process->run();
+
+        if (! $process->isSuccessful()) {
+            throw new StepException('Git clone failed: '.trim($process->getErrorOutput()));
+        }
     }
 }

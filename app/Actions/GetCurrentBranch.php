@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Exceptions\StepException;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class GetCurrentBranch
@@ -13,6 +14,12 @@ class GetCurrentBranch
         $process = (new CreateSshConnection)($server ?? $site)
             ->execute("sudo git --work-tree=/var/www/{$site}/current --git-dir=/var/www/{$site}/current/.git rev-parse --abbrev-ref HEAD");
 
-        return trim($process->getOutput());
+        $branch = trim($process->getOutput());
+
+        if (empty($branch)) {
+            throw new StepException("Could not fetch current branch for {$site}.");
+        }
+
+        return $branch;
     }
 }

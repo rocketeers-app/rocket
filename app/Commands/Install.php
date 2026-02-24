@@ -16,7 +16,6 @@ use App\Actions\IsWordPress;
 use App\Actions\IsolatePhpVersion;
 use App\Actions\NpmInstall;
 use App\Actions\PutEnvLocally;
-use App\Actions\RsyncSite;
 use App\Actions\RunMigrations;
 use App\Actions\SecureSite;
 use App\Commands\Concerns\WithSteps;
@@ -62,15 +61,7 @@ class Install extends Command
         $importAction = new ImportRemoteDatabase;
         $credentials = $this->step('Fetching database credentials', fn () => $importAction->fetchCredentials($site, $server));
         $this->step('Preparing local database', fn () => $importAction->prepareLocalDatabase($credentials['name']));
-        $importSuccess = $this->step('Importing remote database', fn () => $importAction->importDatabase($credentials, $server));
-
-        if (! $importSuccess) {
-            $this->finishProgress();
-            $this->newLine();
-            $this->error($importAction->getError() ?: 'Database import failed.');
-
-            return 1;
-        }
+        $this->step('Importing remote database', fn () => $importAction->importDatabase($credentials, $server));
 
         $this->step('Running composer install', fn () => (new ComposerInstall)($name));
         $this->step('Running migrations', fn () => (new RunMigrations)($name));

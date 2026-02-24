@@ -2,6 +2,7 @@
 
 namespace App\Commands\Concerns;
 
+use App\Exceptions\StepException;
 use Symfony\Component\Console\Helper\ProgressBar;
 
 trait WithSteps
@@ -23,7 +24,15 @@ trait WithSteps
         $this->progressBar->setMessage($message.'...');
         $this->progressBar->display();
 
-        $result = $callback();
+        try {
+            $result = $callback();
+        } catch (StepException $e) {
+            $this->finishProgress();
+            $this->newLine();
+            $this->error($e->getMessage());
+
+            exit(1);
+        }
 
         $this->progressBar->advance();
 

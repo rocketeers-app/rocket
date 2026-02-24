@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Exceptions\StepException;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class GetRepositoryName
@@ -14,8 +15,11 @@ class GetRepositoryName
             ->execute("sudo git --work-tree=/var/www/{$site}/current --git-dir=/var/www/{$site}/current/.git config --get remote.origin.url");
 
         $url = trim($process->getOutput());
-        $name = str_replace('.git', '', last(explode('/', $url)));
 
-        return $name;
+        if (empty($url)) {
+            throw new StepException("Could not fetch repository name for {$site}.");
+        }
+
+        return str_replace('.git', '', last(explode('/', $url)));
     }
 }
