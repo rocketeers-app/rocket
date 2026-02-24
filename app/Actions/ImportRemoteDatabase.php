@@ -9,6 +9,8 @@ class ImportRemoteDatabase
 {
     use AsAction;
 
+    protected string $error = '';
+
     public function handle($site, $server = null)
     {
         $credentials = $this->fetchCredentials($site, $server);
@@ -50,7 +52,7 @@ class ImportRemoteDatabase
         )->run();
     }
 
-    public function importDatabase(array $credentials, string $server): void
+    public function importDatabase(array $credentials, string $server): bool
     {
         $process = Process::fromShellCommandline(
             'set -o pipefail; ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o ServerAliveInterval=60 rocketeer@'.$server
@@ -61,8 +63,13 @@ class ImportRemoteDatabase
         $process->setTimeout(3600);
         $process->run();
 
-        if (! $process->isSuccessful()) {
-            throw new \RuntimeException('Database import failed: '.$process->getErrorOutput());
-        }
+        $this->error = trim($process->getErrorOutput());
+
+        return $process->isSuccessful();
+    }
+
+    public function getError(): string
+    {
+        return $this->error;
     }
 }

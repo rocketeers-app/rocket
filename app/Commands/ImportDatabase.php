@@ -26,9 +26,16 @@ class ImportDatabase extends Command
 
         $credentials = $this->step('Fetching remote credentials', fn () => $action->fetchCredentials($site, $server));
         $this->step('Preparing local database', fn () => $action->prepareLocalDatabase($credentials['name']));
-        $this->step('Importing remote database', fn () => $action->importDatabase($credentials, $server));
+        $success = $this->step('Importing remote database', fn () => $action->importDatabase($credentials, $server));
 
         $this->finishProgress();
+
+        if (! $success) {
+            $this->newLine();
+            $this->error($action->getError() ?: 'Database import failed.');
+
+            return 1;
+        }
 
         (new NotifyLocally)("Database is imported for {$site}", $this);
     }

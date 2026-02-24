@@ -62,7 +62,15 @@ class Install extends Command
         $importAction = new ImportRemoteDatabase;
         $credentials = $this->step('Fetching database credentials', fn () => $importAction->fetchCredentials($site, $server));
         $this->step('Preparing local database', fn () => $importAction->prepareLocalDatabase($credentials['name']));
-        $this->step('Importing remote database', fn () => $importAction->importDatabase($credentials, $server));
+        $importSuccess = $this->step('Importing remote database', fn () => $importAction->importDatabase($credentials, $server));
+
+        if (! $importSuccess) {
+            $this->finishProgress();
+            $this->newLine();
+            $this->error($importAction->getError() ?: 'Database import failed.');
+
+            return 1;
+        }
 
         $this->step('Running composer install', fn () => (new ComposerInstall)($name));
         $this->step('Running migrations', fn () => (new RunMigrations)($name));
