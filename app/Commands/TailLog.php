@@ -10,7 +10,7 @@ use function Laravel\Prompts\select;
 
 class TailLog extends Command
 {
-    protected $signature = 'tail:log {site} {--server=}';
+    protected $signature = 'tail {site} {--server=}';
 
     protected $description = 'Tail a Laravel log file on the remote server';
 
