@@ -10,6 +10,12 @@ class ChangeWorkingDirectory
 
     public function handle($name)
     {
-        chdir("/var/www/{$name}");
+        $path = "/var/www/{$name}";
+
+        if (! is_dir($path)) {
+            mkdir($path, 0755, true);
+        }
+
+        chdir($path);
     }
 }
