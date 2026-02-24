@@ -13,12 +13,13 @@ use App\Actions\GetRepositoryUrl;
 use App\Actions\GitCloneRepository;
 use App\Actions\ImportRemoteDatabase;
 use App\Actions\IsolatePhpVersion;
-use App\Actions\NotifyLocally;
 use App\Actions\NpmInstall;
 use App\Actions\PutEnvLocally;
 use App\Actions\RunMigrations;
 use App\Actions\SecureSite;
 use Illuminate\Console\Command;
+
+use function Laravel\Prompts\spin;
 
 class Install extends Command
 {
@@ -32,30 +33,82 @@ class Install extends Command
         $server = $this->option('server') ?? $site;
         $phpVersion = $this->option('php');
 
-        $url = (new GetRepositoryUrl)($site, $server);
-        $name = (new GetRepositoryName)($site, $server);
-        $branch = (new GetCurrentBranch)($site, $server);
+        $url = spin(
+            fn () => (new GetRepositoryUrl)($site, $server),
+            'Fetching repository URL...'
+        );
+
+        $name = spin(
+            fn () => (new GetRepositoryName)($site, $server),
+            'Fetching repository name...'
+        );
+
+        $branch = spin(
+            fn () => (new GetCurrentBranch)($site, $server),
+            'Fetching current branch...'
+        );
 
         (new ChangeWorkingDirectory)($name);
 
-        (new GitCloneRepository)($name, $url);
+        spin(
+            fn () => (new GitCloneRepository)($name, $url),
+            'Cloning repository...'
+        );
 
-        (new CheckoutBranchLocally)($name, $branch);
+        spin(
+            fn () => (new CheckoutBranchLocally)($name, $branch),
+            'Checking out branch...'
+        );
 
-        (new IsolatePhpVersion)($name, $phpVersion);
+        spin(
+            fn () => (new IsolatePhpVersion)($name, $phpVersion),
+            'Isolating PHP version...'
+        );
 
-        $env = (new GetRemoteDotEnv)($site, $server);
+        $env = spin(
+            fn () => (new GetRemoteDotEnv)($site, $server),
+            'Fetching remote .env...'
+        );
+
         $env = (new ConfigureDotEnvLocally)($env, $name);
 
         (new PutEnvLocally)($env, $name);
 
-        (new ImportRemoteDatabase)($site, $server);
+        $importAction = new ImportRemoteDatabase;
 
-        (new ComposerInstall)($name);
-        (new RunMigrations)($name);
-        (new NpmInstall)($name);
-        (new SecureSite)($name);
+        $credentials = spin(
+            fn () => $importAction->fetchCredentials($site, $server),
+            'Fetching database credentials...'
+        );
 
-        // (new NotifyLocally)($message);
+        spin(
+            fn () => $importAction->prepareLocalDatabase($credentials['name']),
+            'Preparing local database...'
+        );
+
+        spin(
+            fn () => $importAction->importDatabase($credentials, $server),
+            'Importing remote database...'
+        );
+
+        spin(
+            fn () => (new ComposerInstall)($name),
+            'Running composer install...'
+        );
+
+        spin(
+            fn () => (new RunMigrations)($name),
+            'Running migrations...'
+        );
+
+        spin(
+            fn () => (new NpmInstall)($name),
+            'Running npm install...'
+        );
+
+        spin(
+            fn () => (new SecureSite)($name),
+            'Securing site...'
+        );
     }
 }
