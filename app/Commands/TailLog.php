@@ -21,7 +21,7 @@ class TailLog extends Command
 
         $process = Ssh::create('rocketeer', $server)
             ->disableStrictHostKeyChecking()
-            ->execute("ls -t /var/www/{$site}/persistent/storage/logs/laravel-* /var/www/{$site}/logs/* 2>/dev/null");
+            ->execute("find /var/www/{$site}/persistent/storage/logs /var/www/{$site}/logs -type f -name '*.log' 2>/dev/null | sort -r");
 
         $output = trim($process->getOutput());
 
@@ -33,11 +33,30 @@ class TailLog extends Command
 
         $files = collect(explode("\n", $output))
             ->map(fn ($file) => trim($file))
-            ->filter()
+            ->filter(fn ($file) => str_ends_with($file, '.log'))
             ->values()
             ->all();
 
-        $labels = array_map(fn ($file) => basename($file), $files);
+        if (empty($files)) {
+            $this->error('No log files found.');
+
+            return 1;
+        }
+
+        $basePaths = [
+            "/var/www/{$site}/persistent/storage/logs/",
+            "/var/www/{$site}/logs/",
+        ];
+
+        $labels = array_map(function ($file) use ($basePaths) {
+            foreach ($basePaths as $base) {
+                if (str_starts_with($file, $base)) {
+                    return str_replace($base, '', $file);
+                }
+            }
+
+            return basename($file);
+        }, $files);
 
         $selected = select(
             label: 'Which log file?',
