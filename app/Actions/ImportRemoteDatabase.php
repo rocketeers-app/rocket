@@ -78,7 +78,9 @@ class ImportRemoteDatabase
 
             $value = trim($process->getOutput());
 
-            if (empty($value) && $key !== 'DB_PASSWORD') {
+            if (empty($value) && $key === 'DB_HOST') {
+                $value = '127.0.0.1';
+            } elseif (empty($value) && $key !== 'DB_PASSWORD') {
                 throw new StepException("Could not fetch {$wpKey} from remote wp-config.php.");
             }
 
