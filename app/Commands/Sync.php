@@ -51,5 +51,8 @@ class Sync extends Command
         $this->finishProgress();
 
         (new NotifyLocally)("Site {$site} is now in sync.", $this);
+
+        $this->line('');
+        $this->info("Site available at: https://{$site}.test");
     }
 }
