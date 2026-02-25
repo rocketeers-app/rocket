@@ -3,11 +3,14 @@
 namespace App\Commands;
 
 use App\Actions\ConfigureDotEnvLocally;
+use App\Actions\ConfigureWpConfigLocally;
 use App\Actions\GetRemoteDotEnv;
+use App\Actions\GetRemoteWpConfig;
 use App\Actions\ImportRemoteDatabase;
 use App\Actions\IsWordPress;
 use App\Actions\NotifyLocally;
 use App\Actions\PutEnvLocally;
+use App\Actions\PutWpConfigLocally;
 use App\Actions\RsyncSite;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
@@ -26,11 +29,15 @@ class Sync extends Command
         $server = $this->option('server') ?? $site;
         $isWordPress = (new IsWordPress)($site, $server);
 
-        $this->startProgress($isWordPress ? 4 : 6);
+        $this->startProgress(6);
 
         $this->step('Syncing files from remote', fn () => (new RsyncSite)($site, $site, $server));
 
-        if (! $isWordPress) {
+        if ($isWordPress) {
+            $config = $this->step('Fetching remote wp-config.php', fn () => (new GetRemoteWpConfig)($site, $server));
+            $config = (new ConfigureWpConfigLocally)($config, $site);
+            $this->step('Saving wp-config.php locally', fn () => (new PutWpConfigLocally)($config, $site));
+        } else {
             $env = $this->step('Fetching remote .env', fn () => (new GetRemoteDotEnv)($site, $server));
             $env = (new ConfigureDotEnvLocally)($env, $site);
             $this->step('Saving .env locally', fn () => (new PutEnvLocally)($env, $site));
