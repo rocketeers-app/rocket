@@ -21,9 +21,7 @@ class ImportRemoteDatabase
     {
         $isWordPress = (new IsWordPress)($site, $server);
 
-        $name = $isWordPress
-            ? $site
-            : (new GetRepositoryName)($site, $server);
+        $name = (new GetRepositoryName)($site, $server);
 
         $credentials = ['name' => $name];
 
