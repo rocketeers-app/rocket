@@ -71,6 +71,6 @@ class Install extends Command
         $this->finishProgress();
 
         $this->line('');
-        $this->info("Site available at: https://{$name}.test");
+        $this->info("View in browser: https://{$name}.test");
     }
 }
