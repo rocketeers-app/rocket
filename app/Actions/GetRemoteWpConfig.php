@@ -12,7 +12,7 @@ class GetRemoteWpConfig
     public function handle($site, $server = null)
     {
         $process = (new CreateSshConnection)($server ?? $site)
-            ->execute("sudo cat /var/www/{$site}/current/wp-config.php 2>/dev/null || sudo cat /var/www/{$site}/current/public/wp-config.php 2>/dev/null");
+            ->execute("sudo cat /var/www/{$site}/current/wp-config.php 2>/dev/null || sudo cat /var/www/{$site}/current/public/wp-config.php 2>/dev/null || sudo cat /var/www/{$site}/current/config/application.php 2>/dev/null");
 
         $output = $process->getOutput();
 

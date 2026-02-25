@@ -2,7 +2,6 @@
 
 namespace App\Actions;
 
-use App\Exceptions\StepException;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class GetRepositoryName
@@ -17,7 +16,7 @@ class GetRepositoryName
         $url = trim($process->getOutput());
 
         if (empty($url)) {
-            throw new StepException("Could not fetch repository name for {$site}.");
+            return preg_replace('/-[a-z]+$/', '', $site);
         }
 
         return str_replace('.git', '', last(explode('/', $url)));

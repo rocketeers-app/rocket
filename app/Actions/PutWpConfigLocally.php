@@ -13,6 +13,7 @@ class PutWpConfigLocally
         $paths = [
             "/var/www/{$name}/wp-config.php",
             "/var/www/{$name}/public/wp-config.php",
+            "/var/www/{$name}/config/application.php",
         ];
 
         foreach ($paths as $path) {

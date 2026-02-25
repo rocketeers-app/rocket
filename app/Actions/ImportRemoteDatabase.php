@@ -71,7 +71,7 @@ class ImportRemoteDatabase
         foreach ($wpConfigVars as $key => $wpKey) {
             $process = (new CreateSshConnection)($server)
                 ->execute([
-                    "sudo grep \"define.*'{$wpKey}'\" /var/www/{$site}/current/wp-config.php /var/www/{$site}/current/public/wp-config.php 2>/dev/null | head -1 | sed \"s/.*'[^']*'[^']*'\\([^']*\\)'.*/\\1/\"",
+                    "sudo grep \"define.*'{$wpKey}'\" /var/www/{$site}/current/wp-config.php /var/www/{$site}/current/public/wp-config.php /var/www/{$site}/current/config/application.php 2>/dev/null | head -1 | sed \"s/.*'[^']*'[^']*'\\([^']*\\)'.*/\\1/\"",
                 ]);
 
             $value = trim($process->getOutput());
