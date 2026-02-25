@@ -13,6 +13,7 @@ use App\Actions\NotifyLocally;
 use App\Actions\PutEnvLocally;
 use App\Actions\PutWpConfigLocally;
 use App\Actions\RsyncSite;
+use App\Actions\SecureSite;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 
@@ -30,7 +31,7 @@ class Sync extends Command
         $server = $this->option('server') ?? $site;
         $isWordPress = (new IsWordPress)($site, $server);
 
-        $this->startProgress(7);
+        $this->startProgress(8);
 
         $name = $this->step('Fetching repository name', fn () => (new GetRepositoryName)($site, $server));
 
@@ -50,6 +51,8 @@ class Sync extends Command
         $credentials = $this->step('Fetching database credentials', fn () => $importAction->fetchCredentials($site, $server));
         $this->step('Preparing local database', fn () => $importAction->prepareLocalDatabase($credentials['name']));
         $this->step('Importing remote database', fn () => $importAction->importDatabase($credentials, $server));
+
+        $this->step('Securing site', fn () => (new SecureSite)($name));
 
         $this->finishProgress();
 
