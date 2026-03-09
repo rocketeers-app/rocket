@@ -25,7 +25,7 @@ class ImportRemoteDatabase
 
         $credentials = ['name' => $name];
 
-        if ($isWordPress) {
+        if ($isWordPress && ! (new IsBedrock)($site, $server)) {
             $credentials = array_merge($credentials, $this->fetchWordPressCredentials($site, $server));
         } else {
             $credentials = array_merge($credentials, $this->fetchEnvCredentials($site, $server));
@@ -47,7 +47,9 @@ class ImportRemoteDatabase
 
             $value = trim($process->getOutput());
 
-            if (empty($value) && $var !== 'DB_PASSWORD') {
+            if (empty($value) && $var === 'DB_HOST') {
+                $value = '127.0.0.1';
+            } elseif (empty($value) && $var !== 'DB_PASSWORD') {
                 throw new StepException("Could not fetch {$var} from remote .env.");
             }
 

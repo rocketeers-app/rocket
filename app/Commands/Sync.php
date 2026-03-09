@@ -8,6 +8,7 @@ use App\Actions\GetRemoteDotEnv;
 use App\Actions\GetRemoteWpConfig;
 use App\Actions\GetRepositoryName;
 use App\Actions\ImportRemoteDatabase;
+use App\Actions\IsBedrock;
 use App\Actions\IsWordPress;
 use App\Actions\NotifyLocally;
 use App\Actions\PutEnvLocally;
@@ -37,7 +38,7 @@ class Sync extends Command
 
         $this->step('Syncing files from remote', fn () => (new RsyncSite)($name, $site, $server));
 
-        if ($isWordPress) {
+        if ($isWordPress && ! (new IsBedrock)($site, $server)) {
             $config = $this->step('Fetching remote wp-config.php', fn () => (new GetRemoteWpConfig)($site, $server));
             $config = (new ConfigureWpConfigLocally)($config, $name);
             $this->step('Saving wp-config.php locally', fn () => (new PutWpConfigLocally)($config, $name));
