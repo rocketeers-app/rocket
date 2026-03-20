@@ -38,16 +38,31 @@ class ImportRemoteDatabase
 
     protected function fetchEnvCredentials($site, $server): array
     {
-        $envVars = ['DB_HOST', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD'];
+        $envVars = [
+            'DB_HOST' => 'DB_HOST',
+            'DB_DATABASE' => 'DB_NAME',
+            'DB_USERNAME' => 'DB_USER',
+            'DB_PASSWORD' => 'DB_PASSWORD',
+        ];
+
         $credentials = [];
 
-        foreach ($envVars as $var) {
+        foreach ($envVars as $var => $fallback) {
             $process = (new CreateSshConnection)($server)
                 ->execute([
                     'sudo grep "^'.$var.'=" /var/www/'.$site."/current/.env | grep -v -e '^\s*#' | cut -d '=' -f 2-",
                 ]);
 
             $value = trim($process->getOutput());
+
+            if (empty($value) && $fallback !== $var) {
+                $process = (new CreateSshConnection)($server)
+                    ->execute([
+                        'sudo grep "^'.$fallback.'=" /var/www/'.$site."/current/.env | grep -v -e '^\s*#' | cut -d '=' -f 2-",
+                    ]);
+
+                $value = trim($process->getOutput());
+            }
 
             if (empty($value) && $var !== 'DB_PASSWORD') {
                 throw new StepException("Could not fetch {$var} from remote .env.");
@@ -80,6 +95,8 @@ class ImportRemoteDatabase
 
             if (empty($value) && $key === 'DB_HOST') {
                 $value = '127.0.0.1';
+            } elseif (empty($value) && $key === 'DB_DATABASE') {
+                $value = $site;
             } elseif (empty($value) && $key !== 'DB_PASSWORD') {
                 throw new StepException("Could not fetch {$wpKey} from remote wp-config.php.");
             }
