@@ -25,22 +25,20 @@ class ApiRequest
     {
         $items = [];
         $page = 1;
-        $meta = [];
-        $servedIn = [];
+        $total = 0;
+        $perPage = 50;
+        $start = microtime(true);
 
         do {
             $separator = str_contains($endpoint, '?') ? '&' : '?';
             $response = $this->get($endpoint.$separator.'per_page=50&page='.$page);
 
-            if (isset($response['served_in'])) {
-                $servedIn[] = $response['served_in'];
-            }
-
             if (isset($response['data']) && isset($response['meta'])) {
                 $items = array_merge($items, $response['data']);
-                $meta = $response['meta'];
+                $total = $response['meta']['total'] ?? count($items);
+                $perPage = $response['meta']['per_page'] ?? 50;
                 $page++;
-                $hasMore = $page <= ($meta['last_page'] ?? 1);
+                $hasMore = $page <= ($response['meta']['last_page'] ?? 1);
             } else {
                 $items = $response['data'] ?? $response;
                 $hasMore = false;
@@ -51,8 +49,12 @@ class ApiRequest
             return [
                 'data' => $items,
                 'results' => count($items),
-                'meta' => $meta,
-                'served_in' => $servedIn,
+                'meta' => [
+                    'total' => $total,
+                    'per_page' => $perPage,
+                    'pages' => (int) ceil($total / $perPage),
+                ],
+                'served_in' => round((microtime(true) - $start) * 1000, 2).'ms',
             ];
         }
 
