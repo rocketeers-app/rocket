@@ -5,6 +5,7 @@ namespace App\Commands\Api;
 use App\Actions\ApiRequest;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
+use Symfony\Component\Console\Input\InputOption;
 
 abstract class BaseApiCommand extends Command
 {
@@ -21,20 +22,28 @@ abstract class BaseApiCommand extends Command
         return class_basename(static::class);
     }
 
+    protected function configure(): void
+    {
+        parent::configure();
+
+        $this->addOption('metadata', null, InputOption::VALUE_NONE, 'Include results count, meta, and served_in in JSON output');
+    }
+
     public function handle(): int
     {
         $team = $this->argument('team');
+        $withMeta = $this->option('metadata');
 
         if ($this->option('json')) {
             try {
-                $data = ApiRequest::make()->paginated($this->endpoint($team));
+                $result = ApiRequest::make()->paginated($this->endpoint($team), withMeta: $withMeta);
             } catch (\Throwable $e) {
                 $this->output->writeln(json_encode(['error' => $e->getMessage()], JSON_THROW_ON_ERROR));
 
                 return self::FAILURE;
             }
 
-            $this->output->writeln(json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+            $this->output->writeln(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
 
             return self::SUCCESS;
         }
