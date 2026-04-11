@@ -27,7 +27,7 @@ abstract class BaseApiCommand extends Command
 
         if ($this->option('json')) {
             try {
-                $data = $this->fetchAll($team);
+                $data = ApiRequest::make()->paginated($this->endpoint($team));
             } catch (\Throwable $e) {
                 $this->output->writeln(json_encode(['error' => $e->getMessage()], JSON_THROW_ON_ERROR));
 
@@ -41,7 +41,7 @@ abstract class BaseApiCommand extends Command
 
         $this->startProgress(1);
 
-        $data = $this->step('Fetching '.$this->resourceLabel(), fn () => $this->fetchAll($team));
+        $data = $this->step('Fetching '.$this->resourceLabel(), fn () => ApiRequest::make()->paginated($this->endpoint($team)));
 
         $this->finishProgress();
 
@@ -59,26 +59,5 @@ abstract class BaseApiCommand extends Command
         );
 
         return self::SUCCESS;
-    }
-
-    protected function fetchAll(string $team): array
-    {
-        $items = [];
-        $page = 1;
-
-        do {
-            $response = ApiRequest::make()->handle($this->endpoint($team).'?per_page=50&page='.$page, raw: true);
-
-            if (isset($response['data']) && isset($response['meta'])) {
-                $items = array_merge($items, $response['data']);
-                $page++;
-                $hasMore = $page <= ($response['meta']['last_page'] ?? 1);
-            } else {
-                $items = $response['data'] ?? $response;
-                $hasMore = false;
-            }
-        } while ($hasMore);
-
-        return $items;
     }
 }

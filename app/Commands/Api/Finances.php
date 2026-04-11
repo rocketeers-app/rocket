@@ -22,7 +22,7 @@ class Finances extends Command
 
         if ($this->option('json')) {
             try {
-                $data = ApiRequest::make()->handle("{$team}/finances", raw: true);
+                $data = ApiRequest::make()->get("{$team}/finances");
             } catch (\Throwable $e) {
                 $this->output->writeln(json_encode(['error' => $e->getMessage()], JSON_THROW_ON_ERROR));
 
@@ -36,7 +36,7 @@ class Finances extends Command
 
         $this->startProgress(1);
 
-        $data = $this->step('Fetching finances', fn () => ApiRequest::make()->handle("{$team}/finances", raw: true));
+        $data = $this->step('Fetching finances', fn () => ApiRequest::make()->get("{$team}/finances"));
 
         $this->finishProgress();
 
