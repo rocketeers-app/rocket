@@ -2,37 +2,37 @@
 
 namespace App\Commands\Api;
 
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\table;
+use function Laravel\Prompts\warning;
+
 class Services extends BaseApiCommand
 {
     protected string $resource = 'services';
 
     protected function renderCustom(array $data): void
     {
-        if (isset($data['message']) && ! isset($data['services'])) {
-            $this->newLine();
-            $this->info($data['message']);
+        $payload = $data['data'] ?? $data;
+
+        if (isset($payload['message']) && ! isset($payload['services'])) {
+            info($payload['message']);
 
             return;
         }
 
-        $services = $data['services'] ?? [];
+        $services = $payload['services'] ?? [];
 
         if (empty($services)) {
-            $this->newLine();
-            $this->warn('No services installed.');
-        } else {
-            $this->newLine();
-            $this->table(
-                ['Installed service'],
-                collect($services)->map(fn ($service) => [is_array($service) ? json_encode($service) : $service])->all()
-            );
+            warning('No services installed.');
+
+            return;
         }
 
-        if (! empty($data['available_services'])) {
-            $this->newLine();
-            $this->line('<comment>Available:</comment> '.collect($data['available_services'])
-                ->map(fn ($service) => is_array($service) ? json_encode($service) : $service)
-                ->implode(', '));
-        }
+        table(
+            ['Service', 'Version'],
+            collect($services)->map(fn ($service) => is_array($service)
+                ? [$service['service_type'] ?? '-', $service['version'] ?? '-']
+                : [$service, '-'])->all()
+        );
     }
 }

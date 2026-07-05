@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Exceptions\StepException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ApiRequest
@@ -89,6 +90,42 @@ class ApiRequest
         return $response->json();
     }
 
+    public function post(string $endpoint, array $body = []): array
+    {
+        return $this->send('post', $endpoint, $body);
+    }
+
+    public function put(string $endpoint, array $body = []): array
+    {
+        return $this->send('put', $endpoint, $body);
+    }
+
+    public function patch(string $endpoint, array $body = []): array
+    {
+        return $this->send('patch', $endpoint, $body);
+    }
+
+    public function delete(string $endpoint, array $body = []): array
+    {
+        return $this->send('delete', $endpoint, $body);
+    }
+
+    /**
+     * Send a write request and return the decoded body ([] for 204/empty).
+     */
+    private function send(string $verb, string $endpoint, array $body): array
+    {
+        $response = $this->client()->asJson()->{$verb}($this->url($endpoint), $body);
+
+        $this->guard($response);
+
+        if ($response->status() === 204 || blank($response->body())) {
+            return [];
+        }
+
+        return $response->json() ?? [];
+    }
+
     /**
      * An authenticated, JSON pending request against the configured base URL.
      */
@@ -118,8 +155,21 @@ class ApiRequest
             throw new StepException('Token lacks the required ability for this endpoint.');
         }
 
+        if ($response->status() === 422) {
+            $errors = collect($response->json('errors', []))->flatten()->all();
+            $detail = $errors
+                ? PHP_EOL.'  • '.implode(PHP_EOL.'  • ', $errors)
+                : ' '.($response->json('message') ?? 'invalid input');
+
+            throw new StepException('Validation failed:'.$detail);
+        }
+
         if ($response->failed()) {
-            throw new StepException('API request failed: '.$response->status().' '.$response->body());
+            // Surface only the API's message, never the full body (which includes
+            // a stack trace when the server runs with debug enabled).
+            $message = $response->json('message') ?: Str::limit(strip_tags($response->body()), 200);
+
+            throw new StepException('API request failed ('.$response->status().'): '.$message);
         }
     }
 }

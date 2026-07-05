@@ -2,6 +2,9 @@
 
 namespace App\Commands\Api;
 
+use function Laravel\Prompts\table;
+use function Laravel\Prompts\warning;
+
 class Backups extends BaseApiCommand
 {
     protected string $resource = 'backups';
@@ -17,8 +20,8 @@ class Backups extends BaseApiCommand
         foreach ($items as $group) {
             $environment = $group['environment']['name'] ?? '-';
 
-            if($environment !== '-'){
-                $environment .= ' ('. $group['environment']['environment'] . ')';
+            if ($environment !== '-') {
+                $environment .= ' ('.$group['environment']['environment'].')';
             }
 
             foreach ($group['databaseBackups'] ?? [] as $backup) {
@@ -31,13 +34,11 @@ class Backups extends BaseApiCommand
         }
 
         if (empty($rows)) {
-            $this->newLine();
-            $this->warn('No backups found.');
+            warning('No backups found.');
 
             return;
         }
 
-        $this->newLine();
-        $this->table(['Environment', 'Type', 'Filename', 'Size', 'Created'], $rows);
+        table(['Environment', 'Type', 'Filename', 'Size', 'Created'], $rows);
     }
 }

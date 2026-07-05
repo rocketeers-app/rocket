@@ -8,6 +8,10 @@ use App\Commands\Api\Concerns\InteractsWithApi;
 use App\Exceptions\StepException;
 use Illuminate\Console\Command;
 
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\select;
+use function Laravel\Prompts\warning;
+
 class UseTeam extends Command
 {
     use InteractsWithApi;
@@ -22,13 +26,10 @@ class UseTeam extends Command
 
         if ($slug = $this->argument('slug')) {
             $credentials->store('DEFAULT_TEAM', $slug);
-            $this->info("Default team set to: {$slug}");
+            info("Default team set to: {$slug}");
 
             return self::SUCCESS;
         }
-
-        $current = $credentials->defaultTeam();
-        $this->line('Current default team: '.($current ?: '<none>'));
 
         try {
             $teams = ApiRequest::make()->paginated('me/teams');
@@ -37,16 +38,23 @@ class UseTeam extends Command
         }
 
         if (empty($teams)) {
-            $this->warn('You are not a member of any teams.');
+            warning('You are not a member of any teams.');
 
             return self::SUCCESS;
         }
 
-        $slugs = collect($teams)->pluck('slug')->all();
-        $picked = $this->choice('Select your default team', $slugs, $current && in_array($current, $slugs, true) ? $current : null);
+        $options = collect($teams)->pluck('name', 'slug')->all();
+        $current = $credentials->defaultTeam();
+
+        $picked = select(
+            label: 'Select your default team',
+            options: $options,
+            default: $current && isset($options[$current]) ? $current : null,
+            hint: $current ? "Current: {$current}" : '',
+        );
 
         $credentials->store('DEFAULT_TEAM', $picked);
-        $this->info("Default team set to: {$picked}");
+        info("Default team set to: {$picked}");
 
         return self::SUCCESS;
     }

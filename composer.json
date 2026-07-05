@@ -12,6 +12,7 @@
         "laravel-zero/framework": "^12.0",
         "laravel-zero/phar-updater": "^1.4",
         "laravel/pint": "^1.18",
+        "laravel/prompts": "^0.3.21",
         "lorisleiva/laravel-actions": "^2.8",
         "spatie/ssh": "^1.10",
         "symfony/process": "^7.4.5"

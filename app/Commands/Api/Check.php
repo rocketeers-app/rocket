@@ -7,10 +7,16 @@ use App\Exceptions\StepException;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\table;
+use function Laravel\Prompts\warning;
+
 /**
  * Diff the local endpoint registry against the live /docs schema so coverage
- * gaps are visible. Every GET endpoint in the docs should be reachable by a
- * dedicated command or listed under `raw_only` in config/rocket_api.php.
+ * gaps are visible. Every GET endpoint must have a dedicated command or be in
+ * `raw_only`; writes report whether they have a dedicated action or are reachable
+ * only via the generic verb commands (get/post/put/patch/delete).
  */
 class Check extends Command
 {
@@ -18,7 +24,7 @@ class Check extends Command
 
     protected $signature = 'check {--json : Output raw JSON}';
 
-    protected $description = 'Check the endpoint registry against the live API docs';
+    protected $description = 'Check the command registry against the live API docs';
 
     public function handle(): int
     {
@@ -28,38 +34,33 @@ class Check extends Command
             return $this->respondWithError($e->getMessage());
         }
 
-        $docPaths = $this->docGetPaths($docs);        // normalized => original
-        [$byCommand, $rawOnly] = $this->registeredPaths();
+        $dedicated = $this->dedicatedOperations();
+        $rawOnly = array_flip(array_map(fn ($p) => $this->normalize($p), config('rocket_api.raw_only', [])));
 
-        $covered = [];
-        $missing = [];
+        $covered = 0;
+        $missing = [];        // GET endpoints with no command and not raw_only
+        $genericWrites = [];  // writes reachable via generic verb only
 
-        foreach ($docPaths as $normalized => $original) {
-            if (isset($byCommand[$normalized])) {
-                $covered[] = ['path' => $original, 'via' => $byCommand[$normalized]];
-            } elseif (in_array($normalized, $rawOnly, true)) {
-                $covered[] = ['path' => $original, 'via' => 'get (raw)'];
+        foreach ($this->docOperations($docs) as $op) {
+            $norm = $this->normalize($op['path']);
+
+            if (isset($dedicated[$op['method'].' '.$norm]) || isset($rawOnly[$norm])) {
+                $covered++;
+            } elseif ($op['method'] === 'GET') {
+                $missing[] = $op['path'];
             } else {
-                $missing[] = $original;
-            }
-        }
-
-        $stale = [];
-        foreach ($byCommand as $normalized => $command) {
-            if (! isset($docPaths[$normalized])) {
-                $stale[] = ['path' => $normalized, 'command' => $command];
+                $genericWrites[] = $op['method'].' '.$op['path'];
             }
         }
 
         if ($this->option('json')) {
             $this->outputJson([
-                'total' => count($docPaths),
-                'covered' => count($covered),
+                'covered' => $covered,
                 'missing' => $missing,
-                'stale' => $stale,
+                'generic_only_writes' => $genericWrites,
             ]);
         } else {
-            $this->report($docPaths, $covered, $missing, $stale);
+            $this->report($covered, $missing, $genericWrites);
         }
 
         return $missing ? self::FAILURE : self::SUCCESS;
@@ -77,23 +78,19 @@ class Check extends Command
     }
 
     /**
-     * @return array<string, string> normalized path => original doc path
+     * @return array<int, array{method: string, path: string}>
      */
-    private function docGetPaths(array $docs): array
+    private function docOperations(array $docs): array
     {
-        $paths = [];
+        $ops = [];
 
         foreach ($docs['items'] ?? [] as $item) {
             foreach ($this->operationsOf($item) as $operation) {
-                if (($operation['method'] ?? null) === 'GET') {
-                    $paths[$this->normalize($operation['path'])] = $operation['path'];
-                }
+                $ops[] = ['method' => $operation['method'] ?? 'GET', 'path' => $operation['path']];
             }
         }
 
-        ksort($paths);
-
-        return $paths;
+        return $ops;
     }
 
     private function operationsOf(array $item): array
@@ -108,22 +105,29 @@ class Check extends Command
     }
 
     /**
-     * @return array{0: array<string, string>, 1: string[]} [normalized => command key], [raw-only normalized]
+     * Every "METHOD normalizedPath" the registry gives a dedicated command:
+     * GET reads plus every write action route.
+     *
+     * @return array<string, true>
      */
-    private function registeredPaths(): array
+    private function dedicatedOperations(): array
     {
-        $byCommand = [];
+        $set = [];
 
-        foreach (config('rocket_api.resources', []) as $key => $definition) {
+        foreach (config('rocket_api.resources', []) as $definition) {
             foreach ($definition['routes'] ?? [] as $route) {
                 $path = is_array($route) ? $route['path'] : $route;
-                $byCommand[$this->normalize($path)] = $key;
+                $set['GET '.$this->normalize($path)] = true;
+            }
+
+            foreach ($definition['writes'] ?? [] as $spec) {
+                foreach ($spec['routes'] as $path) {
+                    $set[$spec['method'].' '.$this->normalize($path)] = true;
+                }
             }
         }
 
-        $rawOnly = array_map(fn ($path) => $this->normalize($path), config('rocket_api.raw_only', []));
-
-        return [$byCommand, $rawOnly];
+        return $set;
     }
 
     /**
@@ -134,26 +138,22 @@ class Check extends Command
         return preg_replace('/\{[^}]+\}/', '{}', ltrim($path, '/'));
     }
 
-    private function report(array $docPaths, array $covered, array $missing, array $stale): void
+    private function report(int $covered, array $missing, array $genericWrites): void
     {
-        $this->newLine();
-        $this->info(sprintf('%d/%d GET endpoints covered.', count($covered), count($docPaths)));
+        info($covered.' endpoints have a dedicated command or raw fallback.');
 
         if ($missing) {
-            $this->newLine();
-            $this->error('Missing (no command, not raw-only):');
-            $this->table(['Endpoint'], array_map(fn ($path) => [$path], $missing));
+            error('Missing GET endpoints (no command, not raw_only):');
+            table(['Endpoint'], array_map(fn ($p) => [$p], $missing));
         }
 
-        if ($stale) {
-            $this->newLine();
-            $this->warn('Stale (in registry, not in docs):');
-            $this->table(['Registry path', 'Command'], array_map(fn ($row) => [$row['path'], $row['command']], $stale));
+        if ($genericWrites) {
+            warning('Writes reachable via generic verb only (no dedicated action):');
+            table(['Endpoint'], array_map(fn ($p) => [$p], $genericWrites));
         }
 
-        if (! $missing && ! $stale) {
-            $this->newLine();
-            $this->info('Registry is in sync with the API docs.');
+        if (! $missing && ! $genericWrites) {
+            info('Every documented endpoint has a dedicated command.');
         }
     }
 }

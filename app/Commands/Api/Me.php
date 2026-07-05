@@ -7,6 +7,8 @@ use App\Commands\Api\Concerns\InteractsWithApi;
 use App\Exceptions\StepException;
 use Illuminate\Console\Command;
 
+use function Laravel\Prompts\table;
+
 class Me extends Command
 {
     use InteractsWithApi;
@@ -27,8 +29,7 @@ class Me extends Command
             return $this->outputJson($user);
         }
 
-        $this->newLine();
-        $this->table(['Field', 'Value'], [
+        table(['Field', 'Value'], [
             ['Name', trim(($user['firstname'] ?? '').' '.($user['lastname'] ?? '')) ?: '-'],
             ['Email', $user['email'] ?? '-'],
             ['Verified', $user['email_verified_at'] ?? 'No'],

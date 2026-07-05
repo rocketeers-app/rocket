@@ -40,23 +40,4 @@ class Get extends Command
 
         return $this->outputJson($result);
     }
-
-    private function resolvePath(): string
-    {
-        $raw = $this->argument('path');
-
-        // Absolute path — hit it as-is (team-less endpoints like /me, /ping).
-        if (str_starts_with($raw, '/')) {
-            return ltrim($raw, '/');
-        }
-
-        $team = $this->resolveTeam();
-        $raw = ltrim($raw, '/');
-
-        if ($raw === $team || str_starts_with($raw, $team.'/')) {
-            return $raw;
-        }
-
-        return $team.'/'.$raw;
-    }
 }

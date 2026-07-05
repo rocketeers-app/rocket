@@ -2,35 +2,43 @@
 
 namespace App\Commands\Api;
 
+use function Laravel\Prompts\note;
+use function Laravel\Prompts\table;
+use function Laravel\Prompts\warning;
+
 class Dns extends BaseApiCommand
 {
     protected string $resource = 'dns';
 
     protected function renderCustom(array $data): void
     {
-        if ($zone = $data['zone'] ?? null) {
-            $this->newLine();
-            $this->table(
-                ['Zone', 'Provider'],
-                [[$zone['name'] ?? '-', $zone['provider_slug'] ?? '-']]
-            );
+        $payload = $data['data'] ?? $data;
+
+        if ($zone = $payload['zone'] ?? null) {
+            note('Zone: '.($zone['name'] ?? '-').'  ('.($zone['provider_slug'] ?? '-').')');
         }
 
-        $records = $data['records'] ?? [];
+        $records = $payload['records'] ?? [];
 
         if (empty($records)) {
-            $this->newLine();
-            $this->warn('No DNS records found.');
+            warning('No DNS records found.');
         } else {
-            $this->newLine();
-            $this->table(
-                ['Record'],
-                collect($records)->map(fn ($record) => [is_array($record) ? json_encode($record) : $record])->all()
+            table(
+                ['Type', 'Name', 'Content', 'TTL'],
+                collect($records)->map(fn ($record) => [
+                    $record['type'] ?? '-',
+                    $record['shortName'] ?? $record['name'] ?? '-',
+                    str((string) ($record['content'] ?? '-'))->limit(60)->toString(),
+                    $record['ttl'] ?? '-',
+                ])->all()
             );
         }
 
-        foreach ($data['warnings'] ?? [] as $warning) {
-            $this->warn($warning['message'] ?? (is_string($warning) ? $warning : json_encode($warning)));
+        $warnings = collect($payload['warnings'] ?? [])
+            ->map(fn ($warning) => $warning['message'] ?? (is_string($warning) ? $warning : json_encode($warning)));
+
+        if ($warnings->isNotEmpty()) {
+            warning($warnings->implode(PHP_EOL));
         }
     }
 }

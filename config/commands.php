@@ -73,8 +73,9 @@ return [
     |
     */
 
-    'remove' => [
-        // ..
-    ],
+    'remove' => \Phar::running() !== '' ? [
+        // Dev-only maintenance commands — excluded from the built PHAR.
+        App\Commands\Api\Docs::class,
+    ] : [],
 
 ];

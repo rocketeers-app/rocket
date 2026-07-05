@@ -2,6 +2,10 @@
 
 namespace App\Commands\Api;
 
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\table;
+use function Laravel\Prompts\warning;
+
 class Finances extends BaseApiCommand
 {
     protected string $resource = 'finances';
@@ -11,14 +15,12 @@ class Finances extends BaseApiCommand
         $items = collect($data['data'] ?? [])->filter(fn ($item) => is_array($item));
 
         if ($items->isEmpty()) {
-            $this->newLine();
-            $this->warn('No finance data found.');
+            warning('No finance data found.');
 
             return;
         }
 
-        $this->newLine();
-        $this->table(
+        table(
             ['Category', 'Name', 'Provider', 'Price'],
             $items->map(fn ($item) => [
                 $item['category'] ?? '-',
@@ -29,8 +31,7 @@ class Finances extends BaseApiCommand
         );
 
         if (! empty($data['totals'])) {
-            $this->newLine();
-            $this->table(
+            table(
                 ['Category', 'Count', 'Total'],
                 collect($data['totals'])->map(fn ($total) => [
                     $total['category'] ?? '-',
@@ -40,7 +41,6 @@ class Finances extends BaseApiCommand
             );
         }
 
-        $this->newLine();
-        $this->info('Grand total: €'.number_format((float) ($data['grand_total'] ?? 0), 2));
+        info('Grand total: €'.number_format((float) ($data['grand_total'] ?? 0), 2));
     }
 }

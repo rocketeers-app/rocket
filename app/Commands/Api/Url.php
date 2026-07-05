@@ -5,6 +5,10 @@ namespace App\Commands\Api;
 use App\Actions\Credentials;
 use Illuminate\Console\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\note;
+
 class Url extends Command
 {
     protected $signature = 'url {url? : Base API URL, e.g. https://rocketeers-app-v2.test/api/v1}';
@@ -17,19 +21,19 @@ class Url extends Command
 
         if ($url = $this->argument('url')) {
             if (! str_starts_with($url, 'http://') && ! str_starts_with($url, 'https://')) {
-                $this->error('URL must start with http:// or https://');
+                error('URL must start with http:// or https://');
 
                 return self::FAILURE;
             }
 
             $url = rtrim($url, '/');
             $credentials->store('API_URL', $url);
-            $this->info("API URL set to: {$url}");
+            info("API URL set to: {$url}");
 
             return self::SUCCESS;
         }
 
-        $this->line('Current API URL: '.$credentials->apiUrl());
+        note('Current API URL: '.$credentials->apiUrl());
 
         return self::SUCCESS;
     }

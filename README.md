@@ -64,7 +64,7 @@ Common flags on every resource command:
 
 Which scopes a command accepts depends on the resource — run it with an unsupported
 combination and it lists the valid ones. `rocket check` confirms every documented
-GET endpoint is reachable.
+endpoint (read and write) is reachable.
 
 | Command | Scopes (besides `--team`) |
 |---------|---------------------------|
@@ -94,10 +94,58 @@ GET endpoint is reachable.
 | `rocket tasks` | `--id` |
 | `rocket vulnerabilities` | `--id` |
 
-Anything without a dedicated command (e.g. server stats) is reachable via
-`rocket get`, for example:
+#### Writing (create / update / delete / actions)
+
+Resource commands also write. Use `--create`, `--update`, `--delete`, or
+`--action=<name>`, supplying body fields with repeatable `-F key=value` (and/or a
+raw `--data '<json>'`). Missing required fields are prompted for interactively.
 
 ```bash
-rocket get servers/<id>/stats --team=team-rocket
-rocket get /me            # absolute path — no team prefix
+rocket sites --create --team=team-rocket -F name=Shop -F manager_id=<id>
+rocket sites --update --id=<id> --team=team-rocket -F name=Renamed
+rocket sites --delete --id=<id> --team=team-rocket          # confirms first
+rocket servers --action=reboot --id=<id> --team=team-rocket # confirms first
+rocket daemons --create --server=<id> --team=team-rocket \
+  -F name=worker -F command="php artisan queue:work"        # nested scope
+```
+
+Write flags:
+
+| Flag | Description |
+|------|-------------|
+| `--create` / `--update` / `--delete` | CRUD on the resource (`--update`/`--delete` need `--id`) |
+| `--action=<name>` | Run a named action (see per-resource actions below) |
+| `-F, --field key=value` | Body field (repeatable; `true`/`false`/`null`/integers are cast) |
+| `--data '<json>'` | Raw JSON body (merged with `--field`) |
+| `--force` | Skip the confirmation prompt on destructive actions |
+
+**Destructive safety.** Deletes and impactful actions (`reboot`, `deploy`, `detach`,
+DNS `clear`, …) prompt for confirmation first; pass `--force` to skip (scripts/CI).
+
+Per-resource actions (beyond create/update/delete):
+
+| Command | Actions (`--action=`) |
+|---------|------------------------|
+| `rocket backups` | `run` |
+| `rocket databases` | `attach` · `detach` |
+| `rocket deployments` | `--create` (triggers a deploy) |
+| `rocket dns` | `--create`/`--update`/`--delete` records · `clear` · `template` |
+| `rocket domains` | `--create` · `sync` · `response-time` |
+| `rocket environments` | `auto-deploy` · `sla-status` · `attach-server` · `detach-server` · `set-web` |
+| `rocket errors` | `ignore` · `--delete` (occurrences) |
+| `rocket incidents` | `acknowledge` · `investigate` · `monitor` · `resolve` |
+| `rocket issues` | `labels` · `toggle-status` |
+| `rocket servers` | `reboot` · `sync` · `rename` · `access` · `blacklist` · `check-availability` · `check-username` · `install-service` |
+| `rocket storages` | `attach` · `sync` |
+| `rocket tasks` | `run` · `schedule` · `unschedule` · `toggle-schedule` |
+
+#### Raw requests
+
+Any endpoint is reachable with the raw verb commands (the `gh api` model):
+
+```bash
+rocket get servers/<id>/stats --team=team-rocket   # absolute /me works too
+rocket post servers/<id>/reboot --team=team-rocket
+rocket put sites/<id> --team=team-rocket -F name=Renamed
+rocket delete sites/<id> --team=team-rocket        # confirms, or --force
 ```
