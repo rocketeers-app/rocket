@@ -29,14 +29,22 @@
     "config": {
         "preferred-install": "dist",
         "sort-packages": true,
-        "optimize-autoloader": true
+        "optimize-autoloader": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
     },
     "scripts": {
         "post-create-project-cmd": [
             "@php application app:rename"
-        ]
+        ],
+        "test": "pest"
     },
     "minimum-stability": "dev",
     "prefer-stable": true,
-    "bin": ["builds/rocket"]
+    "bin": ["builds/rocket"],
+    "require-dev": {
+        "mockery/mockery": "^1.6",
+        "pestphp/pest": "^4.4"
+    }
 }

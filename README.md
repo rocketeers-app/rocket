@@ -20,29 +20,84 @@ composer global require rocketeers-app/rocket
 
 ### API commands
 
-Interact with the Rocketeers API. Requires an API token (see `rocket api:auth`).
+Interact with the Rocketeers API. Run `rocket auth` first — it stores your API
+token (and an optional default team) in `~/.rocketeers/.env`. When a token is already
+configured, `auth` verifies it and lets you change the key, set a default team, or
+log out.
+
+#### Account & configuration
 
 | Command | Description |
 |---------|-------------|
-| `rocket api:auth` | Configure your Rocketeers API token |
-| `rocket api:me [--json]` | Show your Rocketeers profile |
-| `rocket api:teams [--json]` | List your Rocketeers teams |
+| `rocket auth` | Configure/verify your API token; change key, set default team, set API URL, or log out |
+| `rocket url {url?}` | Set or show the API base URL (omit the URL to show the current one) |
+| `rocket use-team {slug?}` | Set or show your default team (omit the slug to pick interactively) |
+| `rocket me [--json]` | Show your Rocketeers profile |
+| `rocket teams [--json]` | List your Rocketeers teams |
+| `rocket check [--json]` | Verify the command registry against the live API docs |
+| `rocket get {path} [--team=]` | Call any GET endpoint directly (raw JSON) |
 
-The following commands require a `{team}` slug argument and support `--json` for raw JSON output and `--metadata` to include result counts, pagination meta, and response time:
+#### Resources
 
-| Command | Description |
-|---------|-------------|
-| `rocket api:clients {team}` | List clients |
-| `rocket api:daemons {team}` | List daemons |
-| `rocket api:databases {team}` | List databases |
-| `rocket api:domains {team}` | List domains |
-| `rocket api:errors {team}` | List errors |
-| `rocket api:finances {team}` | Show finance overview |
-| `rocket api:incidents {team}` | List incidents |
-| `rocket api:projects {team}` | List projects |
-| `rocket api:repositories {team}` | List repositories |
-| `rocket api:schedulers {team}` | List schedulers |
-| `rocket api:servers {team}` | List servers |
-| `rocket api:sites {team}` | List sites |
-| `rocket api:storages {team}` | List storages |
-| `rocket api:tasks {team}` | List server tasks |
+Every resource command is team-scoped. The team comes from `--team=<slug>` or your
+configured default (`use-team`); `--team` always wins.
+
+```bash
+rocket sites --team=team-rocket                 # list a team's sites
+rocket sites --team=team-rocket --id=<id>       # show a single site
+rocket daemons --team=team-rocket --server=<id> # daemons on a server
+rocket daemons --team=team-rocket --env=<id>    # daemons in an environment
+```
+
+Common flags on every resource command:
+
+| Flag | Description |
+|------|-------------|
+| `--team=` | Team slug (falls back to your default) |
+| `--id=` | Fetch a single record |
+| `--server=` | Scope to a server |
+| `--environment=` / `--env=` | Scope to an environment |
+| `--domain=` | Scope to a domain |
+| `--page=` / `--per-page=` | Paginate (default: fetch all pages, max 50 per page) |
+| `--json` | Output raw JSON |
+| `--metadata` | Include result count, pagination meta, and response time in JSON |
+
+Which scopes a command accepts depends on the resource — run it with an unsupported
+combination and it lists the valid ones. `rocket check` confirms every documented
+GET endpoint is reachable.
+
+| Command | Scopes (besides `--team`) |
+|---------|---------------------------|
+| `rocket apps` | `--id` |
+| `rocket backups` | `--server` |
+| `rocket certificates` | `--server` |
+| `rocket clients` | `--id` |
+| `rocket commands` | `--environment` |
+| `rocket daemons` | `--server` · `--environment` |
+| `rocket databases` | `--server` · `--environment` |
+| `rocket deployments` | `--environment` (list) · `--environment --id` (show) |
+| `rocket dns` | `--domain` |
+| `rocket domains` | `--id` · `--server` |
+| `rocket environments` | `--id` |
+| `rocket errors` | `--id` · `--environment` |
+| `rocket finances` | — |
+| `rocket incidents` | `--id` · `--domain` |
+| `rocket issues` | `--id` |
+| `rocket projects` | `--id` |
+| `rocket redirects` | `--environment` |
+| `rocket repositories` | `--server` |
+| `rocket schedulers` | `--server` · `--environment` |
+| `rocket servers` | `--id` · `--environment` |
+| `rocket services` | `--server` |
+| `rocket sites` | `--id` · `--server` |
+| `rocket storages` | `--environment` |
+| `rocket tasks` | `--id` |
+| `rocket vulnerabilities` | `--id` |
+
+Anything without a dedicated command (e.g. server stats) is reachable via
+`rocket get`, for example:
+
+```bash
+rocket get servers/<id>/stats --team=team-rocket
+rocket get /me            # absolute path — no team prefix
+```
