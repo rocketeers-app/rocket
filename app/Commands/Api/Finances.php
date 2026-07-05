@@ -1,0 +1,46 @@
+<?php
+
+namespace App\Commands\Api;
+
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\table;
+use function Laravel\Prompts\warning;
+
+class Finances extends BaseApiCommand
+{
+    protected string $resource = 'finances';
+
+    protected function renderCustom(array $data): void
+    {
+        $items = collect($data['data'] ?? [])->filter(fn ($item) => is_array($item));
+
+        if ($items->isEmpty()) {
+            warning('No finance data found.');
+
+            return;
+        }
+
+        table(
+            ['Category', 'Name', 'Provider', 'Price'],
+            $items->map(fn ($item) => [
+                $item['category'] ?? '-',
+                $item['name'] ?? '-',
+                $item['provider_label'] ?? $item['provider'] ?? '-',
+                empty($item['price']) ? '-' : '€'.number_format((float) $item['price'], 2),
+            ])->all()
+        );
+
+        if (! empty($data['totals'])) {
+            table(
+                ['Category', 'Count', 'Total'],
+                collect($data['totals'])->map(fn ($total) => [
+                    $total['category'] ?? '-',
+                    $total['count'] ?? 0,
+                    empty($total['total']) ? '-' : '€'.number_format((float) $total['total'], 2),
+                ])->all()
+            );
+        }
+
+        info('Grand total: €'.number_format((float) ($data['grand_total'] ?? 0), 2));
+    }
+}

@@ -12,6 +12,7 @@
         "laravel-zero/framework": "^12.0",
         "laravel-zero/phar-updater": "^1.4",
         "laravel/pint": "^1.18",
+        "laravel/prompts": "^0.3.21",
         "lorisleiva/laravel-actions": "^2.8",
         "spatie/ssh": "^1.10",
         "symfony/process": "^7.4.5"
@@ -29,14 +30,22 @@
     "config": {
         "preferred-install": "dist",
         "sort-packages": true,
-        "optimize-autoloader": true
+        "optimize-autoloader": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
     },
     "scripts": {
         "post-create-project-cmd": [
             "@php application app:rename"
-        ]
+        ],
+        "test": "pest"
     },
     "minimum-stability": "dev",
     "prefer-stable": true,
-    "bin": ["builds/rocket"]
+    "bin": ["builds/rocket"],
+    "require-dev": {
+        "mockery/mockery": "^1.6",
+        "pestphp/pest": "^4.4"
+    }
 }

@@ -25,14 +25,14 @@ class ConfigureWpConfigLocally
             $replacement = $value ? 'true' : 'false';
 
             return preg_replace(
-                "/define\s*\(\s*['\"]" . preg_quote($key, '/') . "['\"]\s*,\s*.*?\)/",
+                "/define\s*\(\s*['\"]".preg_quote($key, '/')."['\"]\s*,\s*.*?\)/",
                 "define('{$key}', {$replacement})",
                 $config
             );
         }
 
         return preg_replace(
-            "/define\s*\(\s*['\"]" . preg_quote($key, '/') . "['\"]\s*,\s*.*?\)/",
+            "/define\s*\(\s*['\"]".preg_quote($key, '/')."['\"]\s*,\s*.*?\)/",
             "define('{$key}', '{$value}')",
             $config
         );
