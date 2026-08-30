@@ -18,23 +18,25 @@ class ImportDatabase extends Command
 
     public function handle()
     {
-        $site = $this->argument('site');
-        $server = $this->option('server') ?? $site;
+        return $this->runWithSteps(function () {
+            $site = $this->argument('site');
+            $server = $this->option('server') ?? $site;
 
-        if (! $this->validateSiteAndServer($site, $server)) {
-            return self::FAILURE;
-        }
+            if (! $this->validateSiteAndServer($site, $server)) {
+                return self::FAILURE;
+            }
 
-        $action = new ImportRemoteDatabase;
+            $action = new ImportRemoteDatabase;
 
-        $this->startProgress(3);
+            $this->startProgress(3);
 
-        $credentials = $this->step('Fetching remote credentials', fn () => $action->fetchCredentials($site, $server));
-        $this->step('Preparing local database', fn () => $action->prepareLocalDatabase($credentials['name']));
-        $this->step('Importing remote database', fn () => $action->importDatabase($credentials, $server));
+            $credentials = $this->step('Fetching remote credentials', fn () => $action->fetchCredentials($site, $server));
+            $this->step('Preparing local database', fn () => $action->prepareLocalDatabase($credentials['name']));
+            $this->step('Importing remote database', fn () => $action->importDatabase($credentials, $server));
 
-        $this->finishProgress();
+            $this->finishProgress();
 
-        (new NotifyLocally)("Database is imported for {$site}", $this);
+            (new NotifyLocally)("Database is imported for {$site}", $this);
+        });
     }
 }

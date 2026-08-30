@@ -19,44 +19,46 @@ class SshConfig extends Command
 
     public function handle()
     {
-        (new SetApiToken)($this);
+        return $this->runWithSteps(function () {
+            (new SetApiToken)($this);
 
-        $this->startProgress(2);
+            $this->startProgress(2);
 
-        $sshConfig = $this->step('Fetching SSH config', fn () => (string) Http::timeout(5)
-            ->withoutVerifying()
-            ->withHeaders([
-                'Authorization' => 'Bearer '.env('API_TOKEN'),
-            ])
-            ->get('https://rocketeers.app/api/v1/ssh/config'));
+            $sshConfig = $this->step('Fetching SSH config', fn () => (string) Http::timeout(5)
+                ->withoutVerifying()
+                ->withHeaders([
+                    'Authorization' => 'Bearer '.env('API_TOKEN'),
+                ])
+                ->get('https://rocketeers.app/api/v1/ssh/config'));
 
-        $this->step('Updating local SSH config', function () use ($sshConfig) {
-            $delimiter = '### ROCKETEERS APP ###';
-            $currentSshConfig = (new GetCurrentSshConfig)();
+            $this->step('Updating local SSH config', function () use ($sshConfig) {
+                $delimiter = '### ROCKETEERS APP ###';
+                $currentSshConfig = (new GetCurrentSshConfig)();
 
-            if (str_contains(trim($currentSshConfig), $delimiter)) {
-                $newSshConfig = preg_replace_callback(
-                    '/'.preg_quote($delimiter, '/').'.*'.preg_quote($delimiter, '/').'/ims',
-                    fn ($matches) => $delimiter.PHP_EOL.PHP_EOL.$sshConfig.PHP_EOL.PHP_EOL.$delimiter,
-                    $currentSshConfig
-                );
-            } else {
-                $newSshConfig = trim($currentSshConfig.PHP_EOL.PHP_EOL.$delimiter.PHP_EOL.PHP_EOL.$sshConfig.PHP_EOL.PHP_EOL.$delimiter);
-            }
+                if (str_contains(trim($currentSshConfig), $delimiter)) {
+                    $newSshConfig = preg_replace_callback(
+                        '/'.preg_quote($delimiter, '/').'.*'.preg_quote($delimiter, '/').'/ims',
+                        fn ($matches) => $delimiter.PHP_EOL.PHP_EOL.$sshConfig.PHP_EOL.PHP_EOL.$delimiter,
+                        $currentSshConfig
+                    );
+                } else {
+                    $newSshConfig = trim($currentSshConfig.PHP_EOL.PHP_EOL.$delimiter.PHP_EOL.PHP_EOL.$sshConfig.PHP_EOL.PHP_EOL.$delimiter);
+                }
 
-            $sshDir = getenv('HOME').'/.ssh';
+                $sshDir = getenv('HOME').'/.ssh';
 
-            if (! is_dir($sshDir)) {
-                mkdir($sshDir, 0700, true);
-            }
+                if (! is_dir($sshDir)) {
+                    mkdir($sshDir, 0700, true);
+                }
 
-            if (file_put_contents($sshDir.'/config', $newSshConfig.PHP_EOL) === false) {
-                throw new StepException('Could not write to '.$sshDir.'/config');
-            }
+                if (file_put_contents($sshDir.'/config', $newSshConfig.PHP_EOL) === false) {
+                    throw new StepException('Could not write to '.$sshDir.'/config');
+                }
 
-            chmod($sshDir.'/config', 0600);
+                chmod($sshDir.'/config', 0600);
+            });
+
+            $this->finishProgress();
         });
-
-        $this->finishProgress();
     }
 }
