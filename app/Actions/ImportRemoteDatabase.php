@@ -96,18 +96,14 @@ class ImportRemoteDatabase
 
     public function prepareLocalDatabase(string $name): void
     {
-        $identifier = $this->quoteMysqlIdentifier($name);
-
         Process::fromShellCommandline(
             'mysql -u root --password= -e "SET @@global.time_zone=\'+00:00\'" 2>/dev/null'
         )->run();
 
-        Process::fromShellCommandline(
-            'mysql -u root --password= -e '.escapeshellarg("DROP DATABASE IF EXISTS `{$identifier}`").' 2>/dev/null'
-        )->run();
+        (new DropLocalDatabase)($name);
 
         $process = Process::fromShellCommandline(
-            'mysql -u root --password= -e '.escapeshellarg("CREATE DATABASE IF NOT EXISTS `{$identifier}` CHARACTER SET utf8 COLLATE utf8_general_ci").' 2>/dev/null'
+            'mysql -u root --password= -e '.escapeshellarg('CREATE DATABASE IF NOT EXISTS `'.$this->quoteMysqlIdentifier($name).'` CHARACTER SET utf8 COLLATE utf8_general_ci').' 2>/dev/null'
         );
         $process->run();
 
