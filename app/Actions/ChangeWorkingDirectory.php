@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Support\LocalSitePath;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ChangeWorkingDirectory
@@ -10,7 +11,7 @@ class ChangeWorkingDirectory
 
     public function handle($name)
     {
-        $path = "/var/www/{$name}";
+        $path = LocalSitePath::for($name);
 
         if (! is_dir($path)) {
             mkdir($path, 0755, true);

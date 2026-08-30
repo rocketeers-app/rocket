@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Exceptions\StepException;
+use App\Support\LocalSitePath;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
@@ -20,7 +21,7 @@ class RsyncSite
             '--exclude=storage',
             '-e', 'ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR',
             "rocketeer@{$server}:/var/www/{$site}/current/",
-            "/var/www/{$name}/",
+            LocalSitePath::for($name).'/',
         ]);
 
         $process->setTimeout(600);

@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Exceptions\StepException;
+use App\Support\LocalSitePath;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
@@ -12,11 +13,13 @@ class GitCloneRepository
 
     public function handle($name, $url)
     {
-        if (is_dir("/var/www/{$name}/.git")) {
+        $path = LocalSitePath::for($name);
+
+        if (is_dir("{$path}/.git")) {
             return;
         }
 
-        $process = new Process(['git', 'clone', $url, '/var/www/'.$name]);
+        $process = new Process(['git', 'clone', $url, $path]);
         $process->setTimeout(300);
         $process->run();
 
