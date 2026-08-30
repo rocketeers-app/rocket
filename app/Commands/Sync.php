@@ -4,12 +4,10 @@ namespace App\Commands;
 
 use App\Actions\ConfigureDotEnvLocally;
 use App\Actions\ConfigureWpConfigLocally;
+use App\Actions\DetectRemoteSite;
 use App\Actions\GetRemoteDotEnv;
 use App\Actions\GetRemoteWpConfig;
-use App\Actions\GetRepositoryName;
 use App\Actions\ImportRemoteDatabase;
-use App\Actions\IsBedrock;
-use App\Actions\IsWordPress;
 use App\Actions\NotifyLocally;
 use App\Actions\PutEnvLocally;
 use App\Actions\PutWpConfigLocally;
@@ -36,15 +34,14 @@ class Sync extends Command
             return self::FAILURE;
         }
 
-        $isWordPress = (new IsWordPress)($site, $server);
-
         $this->startProgress(8);
 
-        $name = $this->step('Fetching repository name', fn () => (new GetRepositoryName)($site, $server));
+        $remoteSite = $this->step('Detecting remote site', fn () => (new DetectRemoteSite)($site, $server));
+        $name = $remoteSite->repositoryName;
 
         $this->step('Syncing files from remote', fn () => (new RsyncSite)($name, $site, $server));
 
-        if ($isWordPress && ! (new IsBedrock)($site, $server)) {
+        if ($remoteSite->isWordPress && ! $remoteSite->isBedrock) {
             $config = $this->step('Fetching remote wp-config.php', fn () => (new GetRemoteWpConfig)($site, $server));
             $config = (new ConfigureWpConfigLocally)($config, $name);
             $this->step('Saving wp-config.php locally', fn () => (new PutWpConfigLocally)($config, $name));
@@ -55,7 +52,7 @@ class Sync extends Command
         }
 
         $importAction = new ImportRemoteDatabase;
-        $credentials = $this->step('Fetching database credentials', fn () => $importAction->fetchCredentials($site, $server));
+        $credentials = $this->step('Fetching database credentials', fn () => $importAction->fetchCredentials($site, $server, $remoteSite));
         $this->step('Preparing local database', fn () => $importAction->prepareLocalDatabase($credentials['name']));
         $this->step('Importing remote database', fn () => $importAction->importDatabase($credentials, $server));
 

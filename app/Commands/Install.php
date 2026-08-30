@@ -7,14 +7,11 @@ use App\Actions\CheckoutBranchLocally;
 use App\Actions\ComposerInstall;
 use App\Actions\ConfigureDotEnvLocally;
 use App\Actions\DetectRemotePhpVersion;
-use App\Actions\GetCurrentBranch;
+use App\Actions\DetectRemoteSite;
 use App\Actions\GetRemoteDotEnv;
-use App\Actions\GetRepositoryName;
-use App\Actions\GetRepositoryUrl;
 use App\Actions\GitCloneRepository;
 use App\Actions\ImportRemoteDatabase;
 use App\Actions\IsolatePhpVersion;
-use App\Actions\IsWordPress;
 use App\Actions\NpmInstall;
 use App\Actions\PutEnvLocally;
 use App\Actions\RunMigrations;
@@ -41,18 +38,32 @@ class Install extends Command
             return self::FAILURE;
         }
 
-        if ((new IsWordPress)($site, $server)) {
+        $remoteSite = (new DetectRemoteSite)($site, $server);
+
+        if ($remoteSite->isWordPress) {
             return $this->call('sync', [
                 'site' => $site,
                 '--server' => $server,
             ]);
         }
 
-        $this->startProgress($phpVersion ? 14 : 15);
+        if ($remoteSite->repositoryUrl === '') {
+            $this->error("Could not fetch repository URL for {$site}.");
 
-        $url = $this->step('Fetching repository URL', fn () => (new GetRepositoryUrl)($site, $server));
-        $name = $this->step('Fetching repository name', fn () => (new GetRepositoryName)($site, $server));
-        $branch = $this->step('Fetching current branch', fn () => (new GetCurrentBranch)($site, $server));
+            return self::FAILURE;
+        }
+
+        if ($remoteSite->branch === '') {
+            $this->error("Could not fetch current branch for {$site}.");
+
+            return self::FAILURE;
+        }
+
+        $name = $remoteSite->repositoryName;
+        $url = $remoteSite->repositoryUrl;
+        $branch = $remoteSite->branch;
+
+        $this->startProgress($phpVersion ? 11 : 12);
 
         if (! $phpVersion) {
             $phpVersion = $this->step('Detecting remote PHP version', fn () => (new DetectRemotePhpVersion)($site, $server));
@@ -69,7 +80,7 @@ class Install extends Command
         (new PutEnvLocally)($env, $name);
 
         $importAction = new ImportRemoteDatabase;
-        $credentials = $this->step('Fetching database credentials', fn () => $importAction->fetchCredentials($site, $server));
+        $credentials = $this->step('Fetching database credentials', fn () => $importAction->fetchCredentials($site, $server, $remoteSite));
         $this->step('Preparing local database', fn () => $importAction->prepareLocalDatabase($credentials['name']));
         $this->step('Importing remote database', fn () => $importAction->importDatabase($credentials, $server));
 

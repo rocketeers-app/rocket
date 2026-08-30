@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Exceptions\StepException;
+use App\Support\RemoteSiteInfo;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
@@ -17,15 +18,18 @@ class ImportRemoteDatabase
         $this->importDatabase($credentials, $server);
     }
 
-    public function fetchCredentials($site, $server): array
+    /**
+     * Pass an already-fetched $remoteSite (e.g. from the Install/Sync
+     * commands, which need it anyway) to skip re-detecting whether the site
+     * is WordPress/Bedrock and what its repository name is over SSH again.
+     */
+    public function fetchCredentials($site, $server, ?RemoteSiteInfo $remoteSite = null): array
     {
-        $isWordPress = (new IsWordPress)($site, $server);
+        $remoteSite ??= (new DetectRemoteSite)($site, $server);
 
-        $name = (new GetRepositoryName)($site, $server);
+        $credentials = ['name' => $remoteSite->repositoryName];
 
-        $credentials = ['name' => $name];
-
-        if ($isWordPress && ! (new IsBedrock)($site, $server)) {
+        if ($remoteSite->isWordPress && ! $remoteSite->isBedrock) {
             $credentials = array_merge($credentials, $this->fetchWordPressCredentials($site, $server));
         } else {
             $credentials = array_merge($credentials, $this->fetchEnvCredentials($site, $server));
