@@ -14,7 +14,7 @@ class ComposerInstall
     {
         $herdOrValet = (new UseHerdOrValet)();
 
-        $process = Process::fromShellCommandline(command: "{$herdOrValet} composer install", cwd: "/var/www/{$name}");
+        $process = new Process([$herdOrValet, 'composer', 'install'], cwd: "/var/www/{$name}");
         $process->setTimeout(300);
         $process->run();
 

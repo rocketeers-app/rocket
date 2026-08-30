@@ -3,7 +3,6 @@
 namespace App\Actions;
 
 use Lorisleiva\Actions\Concerns\AsAction;
-use Symfony\Component\Process\Process;
 
 class GetCurrentSshConfig
 {
@@ -11,9 +10,12 @@ class GetCurrentSshConfig
 
     public function handle(): string
     {
-        $process = Process::fromShellCommandline('cat ~/.ssh/config');
-        $process->run();
+        $path = getenv('HOME').'/.ssh/config';
 
-        return trim($process->getOutput());
+        if (! is_file($path)) {
+            return '';
+        }
+
+        return trim(file_get_contents($path));
     }
 }

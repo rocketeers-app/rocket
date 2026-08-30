@@ -12,16 +12,16 @@ class RsyncSite
 
     public function handle($name, $site, $server)
     {
-        $process = Process::fromShellCommandline(
-            'rsync -rlptz --delete'
-            .' --exclude=.env'
-            .' --exclude=node_modules'
-            .' --exclude=vendor'
-            .' --exclude=storage'
-            .' -e "ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR"'
-            .' rocketeer@'.$server.':/var/www/'.$site.'/current/'
-            .' /var/www/'.$name.'/'
-        );
+        $process = new Process([
+            'rsync', '-rlptz', '--delete',
+            '--exclude=.env',
+            '--exclude=node_modules',
+            '--exclude=vendor',
+            '--exclude=storage',
+            '-e', 'ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR',
+            "rocketeer@{$server}:/var/www/{$site}/current/",
+            "/var/www/{$name}/",
+        ]);
 
         $process->setTimeout(600);
         $process->run();

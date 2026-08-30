@@ -4,12 +4,13 @@ namespace App\Commands;
 
 use App\Actions\ImportRemoteDatabase;
 use App\Actions\NotifyLocally;
+use App\Commands\Concerns\ValidatesSiteArguments;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 
 class ImportDatabase extends Command
 {
-    use WithSteps;
+    use ValidatesSiteArguments, WithSteps;
 
     protected $signature = 'db:import {site} {--server=} {--user=rocketeer}';
 
@@ -19,6 +20,10 @@ class ImportDatabase extends Command
     {
         $site = $this->argument('site');
         $server = $this->option('server') ?? $site;
+
+        if (! $this->validateSiteAndServer($site, $server)) {
+            return self::FAILURE;
+        }
 
         $action = new ImportRemoteDatabase;
 

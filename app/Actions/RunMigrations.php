@@ -14,7 +14,7 @@ class RunMigrations
     {
         $herdOrValet = (new UseHerdOrValet)();
 
-        $process = Process::fromShellCommandline(command: "{$herdOrValet} php artisan migrate --force", cwd: "/var/www/{$name}");
+        $process = new Process([$herdOrValet, 'php', 'artisan', 'migrate', '--force'], cwd: "/var/www/{$name}");
         $process->setTimeout(300);
         $process->run();
 

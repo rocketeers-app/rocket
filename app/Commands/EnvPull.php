@@ -11,12 +11,13 @@ use App\Actions\IsWordPress;
 use App\Actions\NotifyLocally;
 use App\Actions\PutEnvLocally;
 use App\Actions\PutWpConfigLocally;
+use App\Commands\Concerns\ValidatesSiteArguments;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 
 class EnvPull extends Command
 {
-    use WithSteps;
+    use ValidatesSiteArguments, WithSteps;
 
     protected $signature = 'env:pull {site} {--server=}';
 
@@ -26,6 +27,11 @@ class EnvPull extends Command
     {
         $site = $this->argument('site');
         $server = $this->option('server') ?? $site;
+
+        if (! $this->validateSiteAndServer($site, $server)) {
+            return self::FAILURE;
+        }
+
         $isWordPress = (new IsWordPress)($site, $server);
 
         if ($isWordPress) {

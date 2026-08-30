@@ -5,9 +5,9 @@ namespace App\Commands;
 use App\Actions\GetCurrentSshConfig;
 use App\Actions\SetApiToken;
 use App\Commands\Concerns\WithSteps;
+use App\Exceptions\StepException;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
-use Symfony\Component\Process\Process;
 
 class SshConfig extends Command
 {
@@ -34,16 +34,27 @@ class SshConfig extends Command
             $delimiter = '### ROCKETEERS APP ###';
             $currentSshConfig = (new GetCurrentSshConfig)();
 
-            if (str_contains(trim((string) $currentSshConfig), $delimiter)) {
-                $newSshConfig = preg_replace_callback('/'.$delimiter.'.*'.$delimiter.'/im', fn ($matches) => $delimiter.PHP_EOL.PHP_EOL.$sshConfig.PHP_EOL.PHP_EOL.$delimiter, (string) $currentSshConfig);
-
-                $process = Process::fromShellCommandline('echo "'.$newSshConfig.'" > ~/.ssh/config');
+            if (str_contains(trim($currentSshConfig), $delimiter)) {
+                $newSshConfig = preg_replace_callback(
+                    '/'.preg_quote($delimiter, '/').'.*'.preg_quote($delimiter, '/').'/ims',
+                    fn ($matches) => $delimiter.PHP_EOL.PHP_EOL.$sshConfig.PHP_EOL.PHP_EOL.$delimiter,
+                    $currentSshConfig
+                );
             } else {
-                $process = Process::fromShellCommandline('echo "'.$delimiter.PHP_EOL.PHP_EOL.$sshConfig.PHP_EOL.PHP_EOL.$delimiter.'" > ~/.ssh/config');
+                $newSshConfig = trim($currentSshConfig.PHP_EOL.PHP_EOL.$delimiter.PHP_EOL.PHP_EOL.$sshConfig.PHP_EOL.PHP_EOL.$delimiter);
             }
 
-            $process->setTimeout(300);
-            $process->run();
+            $sshDir = getenv('HOME').'/.ssh';
+
+            if (! is_dir($sshDir)) {
+                mkdir($sshDir, 0700, true);
+            }
+
+            if (file_put_contents($sshDir.'/config', $newSshConfig.PHP_EOL) === false) {
+                throw new StepException('Could not write to '.$sshDir.'/config');
+            }
+
+            chmod($sshDir.'/config', 0600);
         });
 
         $this->finishProgress();

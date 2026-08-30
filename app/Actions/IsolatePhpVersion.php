@@ -14,7 +14,7 @@ class IsolatePhpVersion
     {
         $herdOrValet = (new UseHerdOrValet)();
 
-        $process = Process::fromShellCommandline(command: "{$herdOrValet} isolate php@{$phpVersion}", cwd: "/var/www/{$name}");
+        $process = new Process([$herdOrValet, 'isolate', "php@{$phpVersion}"], cwd: "/var/www/{$name}");
         $process->setTimeout(300);
         $process->run();
 

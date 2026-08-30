@@ -12,18 +12,19 @@ use App\Actions\GetRepositoryName;
 use App\Actions\GetRepositoryUrl;
 use App\Actions\GitCloneRepository;
 use App\Actions\ImportRemoteDatabase;
-use App\Actions\IsWordPress;
 use App\Actions\IsolatePhpVersion;
+use App\Actions\IsWordPress;
 use App\Actions\NpmInstall;
 use App\Actions\PutEnvLocally;
 use App\Actions\RunMigrations;
 use App\Actions\SecureSite;
+use App\Commands\Concerns\ValidatesSiteArguments;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 
 class Install extends Command
 {
-    use WithSteps;
+    use ValidatesSiteArguments, WithSteps;
 
     protected $signature = 'install {site} {--server=} {--php=8.0}';
 
@@ -34,6 +35,10 @@ class Install extends Command
         $site = $this->argument('site');
         $server = $this->option('server') ?? $site;
         $phpVersion = $this->option('php');
+
+        if (! $this->validateSiteAndServer($site, $server)) {
+            return self::FAILURE;
+        }
 
         if ((new IsWordPress)($site, $server)) {
             return $this->call('sync', [

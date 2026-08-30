@@ -15,12 +15,13 @@ use App\Actions\PutEnvLocally;
 use App\Actions\PutWpConfigLocally;
 use App\Actions\RsyncSite;
 use App\Actions\SecureSite;
+use App\Commands\Concerns\ValidatesSiteArguments;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 
 class Sync extends Command
 {
-    use WithSteps;
+    use ValidatesSiteArguments, WithSteps;
 
     protected $signature = 'sync {site} {--server=}';
 
@@ -30,6 +31,11 @@ class Sync extends Command
     {
         $site = $this->argument('site');
         $server = $this->option('server') ?? $site;
+
+        if (! $this->validateSiteAndServer($site, $server)) {
+            return self::FAILURE;
+        }
+
         $isWordPress = (new IsWordPress)($site, $server);
 
         $this->startProgress(8);
