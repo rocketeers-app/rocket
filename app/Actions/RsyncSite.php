@@ -11,10 +11,16 @@ class RsyncSite
 {
     use AsAction;
 
-    public function handle($name, $site, $server)
+    /**
+     * $dryRun runs rsync with --dry-run --verbose so the caller can show
+     * exactly what would be changed/deleted locally without touching
+     * anything - see the sync {--dry-run} option.
+     */
+    public function handle($name, $site, $server, bool $dryRun = false): string
     {
         $process = new Process([
             'rsync', '-rlptz', '--delete',
+            ...($dryRun ? ['--dry-run', '--verbose'] : []),
             '--exclude=.env',
             '--exclude=node_modules',
             '--exclude=vendor',
@@ -30,5 +36,7 @@ class RsyncSite
         if (! $process->isSuccessful()) {
             throw new StepException('Rsync failed: '.trim($process->getErrorOutput()));
         }
+
+        return $process->getOutput();
     }
 }

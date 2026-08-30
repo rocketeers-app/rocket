@@ -4,15 +4,16 @@ namespace App\Commands;
 
 use App\Actions\ImportRemoteDatabase;
 use App\Actions\NotifyLocally;
+use App\Commands\Concerns\ConfirmsDestructiveAction;
 use App\Commands\Concerns\ValidatesSiteArguments;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 
 class ImportDatabase extends Command
 {
-    use ValidatesSiteArguments, WithSteps;
+    use ConfirmsDestructiveAction, ValidatesSiteArguments, WithSteps;
 
-    protected $signature = 'db:import {site} {--server=} {--user=rocketeer}';
+    protected $signature = 'db:import {site} {--server=} {--user=rocketeer} {--force}';
 
     protected $description = 'Import database';
 
@@ -27,10 +28,16 @@ class ImportDatabase extends Command
             }
 
             $action = new ImportRemoteDatabase;
+            $credentials = $action->fetchCredentials($site, $server);
 
-            $this->startProgress(3);
+            if (! $this->confirmDestructiveAction("This will drop and recreate the local '{$credentials['name']}' database. Continue?")) {
+                $this->warn('Aborted.');
 
-            $credentials = $this->step('Fetching remote credentials', fn () => $action->fetchCredentials($site, $server));
+                return self::SUCCESS;
+            }
+
+            $this->startProgress(2);
+
             $this->step('Preparing local database', fn () => $action->prepareLocalDatabase($credentials['name']));
             $this->step('Importing remote database', fn () => $action->importDatabase($credentials, $server));
 

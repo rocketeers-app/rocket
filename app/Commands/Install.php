@@ -16,15 +16,16 @@ use App\Actions\NpmInstall;
 use App\Actions\PutEnvLocally;
 use App\Actions\RunMigrations;
 use App\Actions\SecureSite;
+use App\Commands\Concerns\ConfirmsDestructiveAction;
 use App\Commands\Concerns\ValidatesSiteArguments;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 
 class Install extends Command
 {
-    use ValidatesSiteArguments, WithSteps;
+    use ConfirmsDestructiveAction, ValidatesSiteArguments, WithSteps;
 
-    protected $signature = 'install {site} {--server=} {--php=}';
+    protected $signature = 'install {site} {--server=} {--php=} {--force}';
 
     protected $description = 'Install site';
 
@@ -64,7 +65,16 @@ class Install extends Command
             $url = $remoteSite->repositoryUrl;
             $branch = $remoteSite->branch;
 
-            $this->startProgress($phpVersion ? 11 : 12);
+            $importAction = new ImportRemoteDatabase;
+            $credentials = $importAction->fetchCredentials($site, $server, $remoteSite);
+
+            if (! $this->confirmDestructiveAction("This will drop and recreate the local '{$credentials['name']}' database. Continue?")) {
+                $this->warn('Aborted.');
+
+                return self::SUCCESS;
+            }
+
+            $this->startProgress($phpVersion ? 10 : 11);
 
             if (! $phpVersion) {
                 $phpVersion = $this->step('Detecting remote PHP version', fn () => (new DetectRemotePhpVersion)($site, $server));
@@ -80,8 +90,6 @@ class Install extends Command
             $env = (new ConfigureDotEnvLocally)($env, $name);
             (new PutEnvLocally)($env, $name);
 
-            $importAction = new ImportRemoteDatabase;
-            $credentials = $this->step('Fetching database credentials', fn () => $importAction->fetchCredentials($site, $server, $remoteSite));
             $this->step('Preparing local database', fn () => $importAction->prepareLocalDatabase($credentials['name']));
             $this->step('Importing remote database', fn () => $importAction->importDatabase($credentials, $server));
 

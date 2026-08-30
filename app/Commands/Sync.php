@@ -13,15 +13,17 @@ use App\Actions\PutEnvLocally;
 use App\Actions\PutWpConfigLocally;
 use App\Actions\RsyncSite;
 use App\Actions\SecureSite;
+use App\Commands\Concerns\ConfirmsDestructiveAction;
 use App\Commands\Concerns\ValidatesSiteArguments;
 use App\Commands\Concerns\WithSteps;
+use App\Support\LocalSitePath;
 use Illuminate\Console\Command;
 
 class Sync extends Command
 {
-    use ValidatesSiteArguments, WithSteps;
+    use ConfirmsDestructiveAction, ValidatesSiteArguments, WithSteps;
 
-    protected $signature = 'sync {site} {--server=}';
+    protected $signature = 'sync {site} {--server=} {--force} {--dry-run}';
 
     protected $description = 'Sync site';
 
@@ -30,15 +32,32 @@ class Sync extends Command
         return $this->runWithSteps(function () {
             $site = $this->argument('site');
             $server = $this->option('server') ?? $site;
+            $dryRun = (bool) $this->option('dry-run');
 
             if (! $this->validateSiteAndServer($site, $server)) {
                 return self::FAILURE;
             }
 
-            $this->startProgress(8);
-
-            $remoteSite = $this->step('Detecting remote site', fn () => (new DetectRemoteSite)($site, $server));
+            $remoteSite = (new DetectRemoteSite)($site, $server);
             $name = $remoteSite->repositoryName;
+
+            if ($dryRun) {
+                $this->info("Dry run for {$name} - showing what rsync would change locally. Nothing is written, and the database is not touched.");
+                $this->newLine();
+                $this->line((new RsyncSite)($name, $site, $server, dryRun: true));
+
+                return self::SUCCESS;
+            }
+
+            if (! $this->confirmDestructiveAction(
+                'This will overwrite local files in '.LocalSitePath::for($name)." (rsync --delete) and drop and recreate the local '{$name}' database. Continue?"
+            )) {
+                $this->warn('Aborted.');
+
+                return self::SUCCESS;
+            }
+
+            $this->startProgress(7);
 
             $this->step('Syncing files from remote', fn () => (new RsyncSite)($name, $site, $server));
 
