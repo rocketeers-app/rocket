@@ -6,6 +6,7 @@ use App\Actions\ChangeWorkingDirectory;
 use App\Actions\CheckoutBranchLocally;
 use App\Actions\ComposerInstall;
 use App\Actions\ConfigureDotEnvLocally;
+use App\Actions\DetectRemotePhpVersion;
 use App\Actions\GetCurrentBranch;
 use App\Actions\GetRemoteDotEnv;
 use App\Actions\GetRepositoryName;
@@ -26,7 +27,7 @@ class Install extends Command
 {
     use ValidatesSiteArguments, WithSteps;
 
-    protected $signature = 'install {site} {--server=} {--php=8.0}';
+    protected $signature = 'install {site} {--server=} {--php=}';
 
     protected $description = 'Install site';
 
@@ -47,11 +48,15 @@ class Install extends Command
             ]);
         }
 
-        $this->startProgress(14);
+        $this->startProgress($phpVersion ? 14 : 15);
 
         $url = $this->step('Fetching repository URL', fn () => (new GetRepositoryUrl)($site, $server));
         $name = $this->step('Fetching repository name', fn () => (new GetRepositoryName)($site, $server));
         $branch = $this->step('Fetching current branch', fn () => (new GetCurrentBranch)($site, $server));
+
+        if (! $phpVersion) {
+            $phpVersion = $this->step('Detecting remote PHP version', fn () => (new DetectRemotePhpVersion)($site, $server));
+        }
 
         (new ChangeWorkingDirectory)($name);
 
