@@ -36,9 +36,7 @@ class DetectRemoteSite
             isWordPress: $this->extract($output, 'IS_WORDPRESS') === 'yes',
             isBedrock: $this->extract($output, 'IS_BEDROCK') === 'yes',
             repositoryUrl: $repositoryUrl,
-            repositoryName: $repositoryUrl !== ''
-                ? str_replace('.git', '', last(explode('/', $repositoryUrl)))
-                : preg_replace('/-[a-z]+$/', '', $site),
+            repositoryName: $this->deriveRepositoryName($repositoryUrl, $site),
             branch: $this->extract($output, 'BRANCH'),
         );
     }
@@ -50,5 +48,19 @@ class DetectRemoteSite
         }
 
         return '';
+    }
+
+    /**
+     * The repository name when a remote origin URL was found, otherwise a
+     * best guess from the site alias itself (stripping a trailing
+     * "-something" suffix, e.g. "example-app-prod" -> "example-app").
+     */
+    protected function deriveRepositoryName(string $repositoryUrl, string $site): string
+    {
+        if ($repositoryUrl === '') {
+            return preg_replace('/-[a-z]+$/', '', $site);
+        }
+
+        return str_replace('.git', '', last(explode('/', $repositoryUrl)));
     }
 }
