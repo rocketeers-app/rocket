@@ -4,32 +4,46 @@ namespace App\Commands;
 
 use App\Actions\ImportRemoteDatabase;
 use App\Actions\NotifyLocally;
+use App\Commands\Concerns\ConfirmsDestructiveAction;
+use App\Commands\Concerns\ValidatesSiteArguments;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 
 class ImportDatabase extends Command
 {
-    use WithSteps;
+    use ConfirmsDestructiveAction, ValidatesSiteArguments, WithSteps;
 
-    protected $signature = 'db:import {site} {--server=} {--user=rocketeer}';
+    protected $signature = 'db:import {site} {--server=} {--user=rocketeer} {--force}';
 
     protected $description = 'Import database';
 
     public function handle()
     {
-        $site = $this->argument('site');
-        $server = $this->option('server') ?? $site;
+        return $this->runWithSteps(function () {
+            $site = $this->argument('site');
+            $server = $this->option('server') ?? $site;
 
-        $action = new ImportRemoteDatabase;
+            if (! $this->validateSiteAndServer($site, $server)) {
+                return self::FAILURE;
+            }
 
-        $this->startProgress(3);
+            $action = new ImportRemoteDatabase;
+            $credentials = $action->fetchCredentials($site, $server);
 
-        $credentials = $this->step('Fetching remote credentials', fn () => $action->fetchCredentials($site, $server));
-        $this->step('Preparing local database', fn () => $action->prepareLocalDatabase($credentials['name']));
-        $this->step('Importing remote database', fn () => $action->importDatabase($credentials, $server));
+            if (! $this->confirmDestructiveAction("This will drop and recreate the local '{$credentials['name']}' database. Continue?")) {
+                $this->warn('Aborted.');
 
-        $this->finishProgress();
+                return self::SUCCESS;
+            }
 
-        (new NotifyLocally)("Database is imported for {$site}", $this);
+            $this->startProgress(2);
+
+            $this->step('Preparing local database', fn () => $action->prepareLocalDatabase($credentials['name']));
+            $this->step('Importing remote database', fn () => $action->importDatabase($credentials, $server));
+
+            $this->finishProgress();
+
+            (new NotifyLocally)("Database is imported for {$site}", $this);
+        });
     }
 }

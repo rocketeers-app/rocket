@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Support\LocalSitePath;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class PutWpConfigLocally
@@ -10,10 +11,12 @@ class PutWpConfigLocally
 
     public function handle($config, $name)
     {
+        $base = LocalSitePath::for($name);
+
         $paths = [
-            "/var/www/{$name}/wp-config.php",
-            "/var/www/{$name}/public/wp-config.php",
-            "/var/www/{$name}/config/application.php",
+            "{$base}/wp-config.php",
+            "{$base}/public/wp-config.php",
+            "{$base}/config/application.php",
         ];
 
         foreach ($paths as $path) {
@@ -24,6 +27,6 @@ class PutWpConfigLocally
             }
         }
 
-        file_put_contents("/var/www/{$name}/wp-config.php", $config);
+        file_put_contents("{$base}/wp-config.php", $config);
     }
 }

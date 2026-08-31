@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Exceptions\StepException;
+use App\Support\LocalSitePath;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
@@ -14,7 +15,7 @@ class RunMigrations
     {
         $herdOrValet = (new UseHerdOrValet)();
 
-        $process = Process::fromShellCommandline(command: "{$herdOrValet} php artisan migrate --force", cwd: "/var/www/{$name}");
+        $process = new Process([$herdOrValet, 'php', 'artisan', 'migrate', '--force'], cwd: LocalSitePath::for($name));
         $process->setTimeout(300);
         $process->run();
 

@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Actions\CreateSshConnection;
+use App\Commands\Concerns\ValidatesSiteArguments;
 use Illuminate\Console\Command;
 use Symfony\Component\Process\Process;
 
@@ -10,6 +11,8 @@ use function Laravel\Prompts\select;
 
 class TailLog extends Command
 {
+    use ValidatesSiteArguments;
+
     protected $signature = 'tail {site} {--server=}';
 
     protected $description = 'Tail a log file on the remote server';
@@ -18,6 +21,10 @@ class TailLog extends Command
     {
         $site = $this->argument('site');
         $server = $this->option('server') ?? $site;
+
+        if (! $this->validateSiteAndServer($site, $server)) {
+            return self::FAILURE;
+        }
 
         $process = (new CreateSshConnection)($server)
             ->execute("find /var/www/{$site}/persistent/storage/logs /var/www/{$site}/logs -type f -name '*.log' 2>/dev/null | sort -r");
@@ -67,6 +74,6 @@ class TailLog extends Command
         (new CreateSshConnection)($server)
             ->configureProcess(fn (Process $process) => $process->setTty(true))
             ->onOutput(fn ($type, $line) => $this->output->write($line))
-            ->execute("tail -f {$selected}");
+            ->execute('tail -f '.escapeshellarg($selected));
     }
 }

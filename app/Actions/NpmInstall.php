@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Exceptions\StepException;
+use App\Support\LocalSitePath;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
@@ -12,7 +13,7 @@ class NpmInstall
 
     public function handle($name)
     {
-        $process = Process::fromShellCommandline(command: 'export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use && npm install && npm run dev', cwd: "/var/www/{$name}");
+        $process = Process::fromShellCommandline(command: 'export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use && npm install && npm run dev', cwd: LocalSitePath::for($name));
         $process->setTimeout(300);
         $process->run();
 

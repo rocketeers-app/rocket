@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Support\LocalSitePath;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class PutEnvLocally
@@ -10,6 +11,6 @@ class PutEnvLocally
 
     public function handle($env, $name)
     {
-        file_put_contents("/var/www/{$name}/.env", $env);
+        file_put_contents(LocalSitePath::for($name).'/.env', $env);
     }
 }
