@@ -21,13 +21,11 @@ class ImportRemoteDatabase
     {
         $isWordPress = (new IsWordPress)($site, $server);
 
-        $name = $isWordPress
-            ? $site
-            : (new GetRepositoryName)($site, $server);
+        $name = (new GetRepositoryName)($site, $server);
 
         $credentials = ['name' => $name];
 
-        if ($isWordPress) {
+        if ($isWordPress && ! (new IsBedrock)($site, $server)) {
             $credentials = array_merge($credentials, $this->fetchWordPressCredentials($site, $server));
         } else {
             $credentials = array_merge($credentials, $this->fetchEnvCredentials($site, $server));
@@ -64,7 +62,9 @@ class ImportRemoteDatabase
                 $value = trim($process->getOutput());
             }
 
-            if (empty($value) && $var !== 'DB_PASSWORD') {
+            if (empty($value) && $var === 'DB_HOST') {
+                $value = '127.0.0.1';
+            } elseif (empty($value) && $var !== 'DB_PASSWORD') {
                 throw new StepException("Could not fetch {$var} from remote .env.");
             }
 
@@ -88,7 +88,7 @@ class ImportRemoteDatabase
         foreach ($wpConfigVars as $key => $wpKey) {
             $process = (new CreateSshConnection)($server)
                 ->execute([
-                    "sudo grep \"define.*'{$wpKey}'\" /var/www/{$site}/current/wp-config.php /var/www/{$site}/current/public/wp-config.php 2>/dev/null | head -1 | sed \"s/.*'[^']*'[^']*'\\([^']*\\)'.*/\\1/\"",
+                    "sudo grep \"define.*'{$wpKey}'\" /var/www/{$site}/current/wp-config.php /var/www/{$site}/current/public/wp-config.php /var/www/{$site}/current/config/application.php 2>/dev/null | head -1 | sed \"s/.*'[^']*'[^']*'\\([^']*\\)'.*/\\1/\"",
                 ]);
 
             $value = trim($process->getOutput());

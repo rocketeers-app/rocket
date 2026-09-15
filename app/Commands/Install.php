@@ -69,5 +69,8 @@ class Install extends Command
         $this->step('Securing site', fn () => (new SecureSite)($name));
 
         $this->finishProgress();
+
+        $this->line('');
+        $this->info("View in browser: https://{$name}.test");
     }
 }

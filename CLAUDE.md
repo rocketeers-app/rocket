@@ -11,6 +11,7 @@
 4. Commit the built PHAR
 5. Tag with `git tag vX.Y.Z`
 6. Push commits and tags
+7. `composer global update` — update the global install
 
 ## Architecture
 - **Actions** (`app/Actions/`) — single-purpose classes using `lorisleiva/laravel-actions`
