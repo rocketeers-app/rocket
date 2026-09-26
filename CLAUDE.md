@@ -11,7 +11,7 @@
 4. `php rocket app:build` — builds PHAR to `builds/rocket`
 5. Commit the built PHAR
 6. Tag with `git tag vX.Y.Z`
-7. Push commits and tags
+7. Push commits and tags to `rocketeers-app/ship` (`main` and `develop`). The split of `packages/rocket` to `rocketeers-app/rocket`, tag included, happens automatically — never run `git subtree split` or push to that repo yourself
 8. `composer global update` — update the global install
 
 ## Architecture
@@ -35,6 +35,7 @@
 - Tests: `composer test` (Pest, Saloon `MockClient::global`, the bundled snapshot); `tests/.home` stands in for `~`
 - `db:import {environment}` finds the environment by slug across every team, imports only MySQL/PostgreSQL that run on one of the team's servers (never ClickHouse, Tinybird, PlanetScale, RDS or other external databases), dumps each on the server it lives on, and asks which one when there are several (`--all` takes every one)
 - `install {environment}` reads everything from `environments:read` and the first connected server (no `--server`/`--php`): local name is the slug minus `-{label}`, in `config('rocketeers.projects_path')` (`/var/www`); the main database is imported as that name and `DB_CONNECTION` points at it. With a `root_directory` (monorepo) the whole repository is cloned into `{projects_path}/{repository}` (`LocalRepositoryName`, from the clone URL), the app is installed in its root directory and named after its basename, the directory around it is parked in Herd, and switching the branch of an existing clone asks first (stops under `--json`)
+- `self-update` is our own command (`SelfUpdate`, not Laravel Zero's phar-updater): newest `vX.Y.Z` tag of `rocketeers-app/rocket` from the GitHub API, `builds/rocket` from raw.githubusercontent.com at that tag, checked with `--version`, then renamed over the running PHAR; after that nothing new may be loaded from the PHAR, so output is prepared up front and it exits
 - SSH connections go through `CreateSshConnection` action (sets `LogLevel=ERROR`, disables strict host key checking)
 - Use `herd isolate` for PHP version per site — NEVER use `herd use` (changes global PHP and breaks rocket)
 - All actions should throw `StepException` with a descriptive message on failure

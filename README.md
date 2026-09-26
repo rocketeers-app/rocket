@@ -39,8 +39,10 @@ rocket
 To update:
 
 ```bash
-composer global update rocketeers-app/rocket
+rocket self-update
 ```
+
+This takes the newest version tagged on GitHub, checks that the download runs as that version, and only then replaces Rocket. `composer global update rocketeers-app/rocket` works too, but Packagist can lag a few minutes behind a release.
 
 ## Getting started
 
