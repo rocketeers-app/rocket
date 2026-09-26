@@ -12,13 +12,15 @@ class RequestApi
 {
     use AsAction;
 
+    public const SETUP_HINT = 'Create a Rocket CLI token in Rocketeers under Settings, API, and run the `rocket setup-token` command it shows.';
+
     public function handle(string $path, ?string $token = null): Response
     {
         $baseUrl = rtrim((string) config('rocketeers.api_url'), '/');
         $token ??= (string) config('rocketeers.api_token');
 
         if (blank($token)) {
-            throw new StepException('No Rocketeers API token configured. Run `rocket login` first.');
+            throw new StepException('No Rocketeers token configured. '.self::SETUP_HINT);
         }
 
         try {
@@ -32,7 +34,7 @@ class RequestApi
         }
 
         if ($response->status() === 401) {
-            throw new StepException('This API token is not valid. Create a new one in Rocketeers under Settings, API, and run `rocket login`.');
+            throw new StepException('This token is not valid. '.self::SETUP_HINT);
         }
 
         if ($response->failed()) {

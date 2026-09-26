@@ -44,13 +44,15 @@ composer global update rocketeers-app/rocket
 
 ## Getting started
 
-### 1. Log in
+### 1. Set up your token
+
+In Rocketeers, go to **Settings, API** and click **Create Rocket CLI token**. Copy the command it shows and run it:
 
 ```bash
-rocket login
+rocket setup-token {token}
 ```
 
-Rocket asks for your Rocketeers API token (create one in Rocketeers under **Settings, API**) and checks it right away against the `/me` endpoint. Only a token that works is saved, to `~/.rocketeers/.env`, readable by you alone. Check which account you're using at any time with `rocket me`.
+This is the only way to authenticate Rocket. It checks the token right away against the `/me` endpoint and only saves a token that works, to `~/.rocketeers/.env`, readable by you alone. Check which account you're using at any time with `rocket me`.
 
 ### 2. Sync your SSH config
 
@@ -58,7 +60,7 @@ Rocket asks for your Rocketeers API token (create one in Rocketeers under **Sett
 rocket ssh:config
 ```
 
-If you haven't logged in yet, Rocket runs `rocket login` first. It then downloads the SSH host entries for all your sites and servers and writes them to `~/.ssh/config` between two `### ROCKETEERS APP ###` markers.
+This needs a token from step 1. It downloads the SSH host entries for all your sites and servers and writes them to `~/.ssh/config` between two `### ROCKETEERS APP ###` markers.
 
 > [!WARNING]
 > If `~/.ssh/config` doesn't have the Rocketeers markers yet, the file is **overwritten**. Back up any existing entries first and add them back outside the markers afterwards.
@@ -157,13 +159,17 @@ rocket tail {site} [--server=]
 
 Rocket finds every `*.log` file in `/var/www/{site}/persistent/storage/logs` and `/var/www/{site}/logs`, lets you pick one, and runs `tail -f` on it. Press `Ctrl+C` to stop.
 
-### `rocket login`
+### `rocket setup-token`
 
-Asks for your API token, checks it against `/me` and saves it when it works. See [Getting started](#1-log-in).
+Authenticates Rocket with a Rocket CLI token: it checks the token against `/me` and saves it when it works. This is the only way to authenticate. See [Getting started](#1-set-up-your-token).
+
+```bash
+rocket setup-token {token}
+```
 
 ### `rocket me`
 
-Shows the name and email of the Rocketeers account your saved API token belongs to, and the API it talks to.
+Shows the name and email of the Rocketeers account your saved API token belongs to.
 
 ### `rocket ssh:config`
 
@@ -204,13 +210,7 @@ All other values stay the same as on the server.
 
 ## Configuration
 
-Rocket keeps its own settings in `~/.rocketeers/.env`:
-
-```dotenv
-API_TOKEN=your-rocketeers-api-token
-```
-
-To use a different token, run `rocket login` again. Rocket talks to `https://api.rocketeersapp.com/v1` by default; set `API_URL` in the same file to point it somewhere else.
+Rocket keeps its token in `~/.rocketeers/.env`, written by `rocket setup-token`. To use a different token, create a new Rocket CLI token and run `rocket setup-token` again. Rocket talks to `https://api.rocketeersapp.com/v1` by default; set `API_URL` in the same file to point it somewhere else.
 
 ## Troubleshooting
 

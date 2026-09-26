@@ -19,7 +19,9 @@ class SshConfig extends Command
     public function handle()
     {
         if (blank(config('rocketeers.api_token'))) {
-            $this->call('login');
+            $this->error('No Rocketeers token configured. '.RequestApi::SETUP_HINT);
+
+            return self::FAILURE;
         }
 
         $this->startProgress(2);
