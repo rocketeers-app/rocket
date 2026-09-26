@@ -14,6 +14,11 @@
 7. Push commits and tags to `rocketeers-app/ship` (`main` and `develop`). The split of `packages/rocket` to `rocketeers-app/rocket`, tag included, happens automatically — never run `git subtree split` or push to that repo yourself
 8. `composer global update` — update the global install
 
+## Packaging
+- The PHAR bundles its own `vendor`, so `composer.json` `require` holds only `php`: every package, runtime ones too, goes in `require-dev`, and `composer global require rocketeers-app/rocket` installs nothing but the PHAR
+- `box.json` has `exclude-dev-files: false` and a `finder` whose `notPath` leaves out the test-only packages (Pest, PHPUnit, Mockery, Pint and what only they need). A new test-only package goes in `notPath`, and its `autoload.files` go in `files` (the autoloader requires them at boot)
+- `.gitattributes` `export-ignore`s everything but `builds/rocket` and `composer.json`, so the dist zip carries just those
+
 ## Architecture
 - **Actions** (`app/Actions/`) — single-purpose classes using `lorisleiva/laravel-actions`
 - **Commands** (`app/Commands/`) — hand-written commands; use `WithSteps` for progress and `OutputsJson` for `--json`
