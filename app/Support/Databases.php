@@ -54,19 +54,7 @@ class Databases
     /** @param array<string, mixed> $database */
     public static function host(array $database): ?string
     {
-        $server = $database['server'] ?? null;
-
-        if (! is_array($server)) {
-            return null;
-        }
-
-        foreach (['ip', 'ipv4_address', 'floating_ip_address'] as $key) {
-            if (filled($server[$key] ?? null)) {
-                return (string) $server[$key];
-            }
-        }
-
-        return null;
+        return is_array($database['server'] ?? null) ? Servers::host($database['server']) : null;
     }
 
     /** @param array<string, mixed> $database */

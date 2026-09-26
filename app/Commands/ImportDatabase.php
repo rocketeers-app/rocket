@@ -14,6 +14,7 @@ use App\Schema\SchemaCache;
 use App\Support\Databases;
 use App\Support\PermissionGate;
 use App\Support\RecordFinder;
+use App\Support\Servers;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 
@@ -156,7 +157,7 @@ class ImportDatabase extends Command
         }
 
         return collect(app(RecordFinder::class)->all($list, $pathValues))
-            ->map(fn (array $server): ?string => Databases::host(['server' => $server]))
+            ->map(fn (array $server): ?string => Servers::host($server))
             ->filter()
             ->values()
             ->all();
