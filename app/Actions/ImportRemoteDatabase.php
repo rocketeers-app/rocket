@@ -3,6 +3,8 @@
 namespace App\Actions;
 
 use App\Exceptions\StepException;
+use App\Support\CommandLog;
+use App\Support\ProcessError;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
@@ -119,21 +121,22 @@ class ImportRemoteDatabase
 
     public function prepareLocalDatabase(string $name): void
     {
-        Process::fromShellCommandline(
+        $log = app(CommandLog::class);
+
+        $log->run(Process::fromShellCommandline(
             'mysql -u root --password="" -e "SET @@global.time_zone=\'+00:00\'" 2>/dev/null'
-        )->run();
+        ));
 
-        Process::fromShellCommandline(
+        $log->run(Process::fromShellCommandline(
             "mysql -u root --password='' -e 'DROP DATABASE IF EXISTS `".$name."`' 2>/dev/null"
-        )->run();
+        ));
 
-        $process = Process::fromShellCommandline(
+        $process = $log->run(Process::fromShellCommandline(
             "mysql -u root --password='' -e 'CREATE DATABASE IF NOT EXISTS `".$name."` CHARACTER SET utf8 COLLATE utf8_general_ci' 2>/dev/null"
-        );
-        $process->run();
+        ));
 
         if (! $process->isSuccessful()) {
-            throw new StepException('Could not create local database: '.trim($process->getErrorOutput()));
+            throw new StepException('Could not create local database: '.ProcessError::message($process));
         }
     }
 

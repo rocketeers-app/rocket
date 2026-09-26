@@ -355,6 +355,17 @@ it('refuses to switch the branch of a monorepo when it cannot ask', function ():
         ->and($this->calls)->toBe([]);
 });
 
+it('shows each step on its own line instead of a progress bar with --verbose', function (): void {
+    installApi([installDatabase('routine_prod', 'mysql_native')]);
+    recordInstallSteps($this);
+
+    [$code, $output] = runCommand('install', ['environment' => 'routine-production', '--verbose' => true]);
+
+    expect($code)->toBe(0)
+        ->and($output)->toContain('→ Preparing the repository on main', '→ Importing routine_prod from 10.0.0.9', '→ Running npm install', '→ Securing the site')
+        ->not->toContain('[▓');
+});
+
 it('no longer takes --server or --php', function (): void {
     $definition = Artisan::all()['install']->getDefinition();
 

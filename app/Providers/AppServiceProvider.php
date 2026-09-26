@@ -6,6 +6,7 @@ use App\Actions\RefreshSchema;
 use App\Console\OperationCommand;
 use App\Console\ResourceCommand;
 use App\Schema\SchemaCache;
+use App\Support\CommandLog;
 use App\Support\PermissionGate;
 use App\Support\Teams;
 use Illuminate\Console\Application as Artisan;
@@ -41,6 +42,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(SchemaCache::class);
+        $this->app->singleton(CommandLog::class);
         $this->app->singleton(Teams::class);
         $this->app->singleton(PermissionGate::class);
     }

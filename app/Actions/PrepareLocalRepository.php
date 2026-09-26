@@ -3,6 +3,8 @@
 namespace App\Actions;
 
 use App\Exceptions\StepException;
+use App\Support\CommandLog;
+use App\Support\ProcessError;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
@@ -82,17 +84,17 @@ class PrepareLocalRepository
 
     private function succeeds(string $directory, array $arguments): bool
     {
-        return (new Process(['git', ...$arguments], $directory))->run() === 0;
+        return app(CommandLog::class)->run(new Process(['git', ...$arguments], $directory))->isSuccessful();
     }
 
     private function git(string $directory, array $arguments): string
     {
         $process = new Process(['git', ...$arguments], $directory);
         $process->setTimeout(300);
-        $process->run();
+        app(CommandLog::class)->run($process);
 
         if (! $process->isSuccessful()) {
-            throw new StepException('git '.implode(' ', $arguments).' failed: '.trim($process->getErrorOutput()));
+            throw new StepException('git '.implode(' ', $arguments).' failed: '.ProcessError::message($process));
         }
 
         return $process->getOutput();

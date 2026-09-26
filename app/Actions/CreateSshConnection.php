@@ -2,16 +2,16 @@
 
 namespace App\Actions;
 
+use App\Support\LoggedSsh;
 use Lorisleiva\Actions\Concerns\AsAction;
-use Spatie\Ssh\Ssh;
 
 class CreateSshConnection
 {
     use AsAction;
 
-    public function handle(string $server, string $user = 'rocketeer'): Ssh
+    public function handle(string $server, string $user = 'rocketeer'): LoggedSsh
     {
-        return Ssh::create($user, $server)
+        return LoggedSsh::create($user, $server)
             ->disableStrictHostKeyChecking()
             ->addExtraOption('-o LogLevel=ERROR');
     }

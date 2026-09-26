@@ -3,6 +3,8 @@
 namespace App\Actions;
 
 use App\Exceptions\StepException;
+use App\Support\CommandLog;
+use App\Support\ProcessError;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
@@ -23,10 +25,10 @@ class NpmBuild
 
         $process = Process::fromShellCommandline(command: app(NpmInstall::class)->command($directory, "npm run {$script}"), cwd: $directory);
         $process->setTimeout(600);
-        $process->run();
+        app(CommandLog::class)->run($process);
 
         if (! $process->isSuccessful()) {
-            throw new StepException("npm run {$script} failed: ".trim($process->getErrorOutput() ?: $process->getOutput()));
+            throw new StepException("npm run {$script} failed: ".ProcessError::message($process));
         }
 
         return $script;

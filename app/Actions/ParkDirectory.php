@@ -3,6 +3,8 @@
 namespace App\Actions;
 
 use App\Exceptions\StepException;
+use App\Support\CommandLog;
+use App\Support\ProcessError;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
@@ -17,10 +19,10 @@ class ParkDirectory
 
         $process = Process::fromShellCommandline(command: "{$herdOrValet} park", cwd: $directory);
         $process->setTimeout(300);
-        $process->run();
+        app(CommandLog::class)->run($process);
 
         if (! $process->isSuccessful()) {
-            throw new StepException("Could not park {$directory}: ".trim($process->getErrorOutput()));
+            throw new StepException("Could not park {$directory}: ".ProcessError::message($process));
         }
     }
 }

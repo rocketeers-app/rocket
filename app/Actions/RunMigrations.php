@@ -3,7 +3,8 @@
 namespace App\Actions;
 
 use App\Exceptions\StepException;
-use Illuminate\Support\Str;
+use App\Support\CommandLog;
+use App\Support\ProcessError;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
@@ -17,17 +18,10 @@ class RunMigrations
 
         $process = Process::fromShellCommandline(command: "{$herdOrValet} php artisan migrate --force", cwd: $directory ?? "/var/www/{$name}");
         $process->setTimeout(300);
-        $process->run();
+        app(CommandLog::class)->run($process);
 
         if (! $process->isSuccessful()) {
-            throw new StepException('Migrations failed: '.$this->errorMessage($process));
+            throw new StepException('Migrations failed: '.ProcessError::message($process));
         }
-    }
-
-    public function errorMessage(Process $process): string
-    {
-        $output = trim($process->getErrorOutput()) ?: trim($process->getOutput());
-
-        return preg_replace('/\s*\n\s*/', ' ', trim(Str::before($output, "\n  at "))) ?: 'no output';
     }
 }

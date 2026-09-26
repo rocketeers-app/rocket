@@ -3,6 +3,8 @@
 namespace App\Actions;
 
 use App\Exceptions\StepException;
+use App\Support\CommandLog;
+use App\Support\ProcessError;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
@@ -16,10 +18,10 @@ class IsolatePhpVersion
 
         $process = Process::fromShellCommandline(command: "{$herdOrValet} isolate php@{$phpVersion}", cwd: $directory ?? "/var/www/{$name}");
         $process->setTimeout(300);
-        $process->run();
+        app(CommandLog::class)->run($process);
 
         if (! $process->isSuccessful()) {
-            throw new StepException("Could not isolate PHP {$phpVersion}: ".trim($process->getErrorOutput()));
+            throw new StepException("Could not isolate PHP {$phpVersion}: ".ProcessError::message($process));
         }
     }
 }

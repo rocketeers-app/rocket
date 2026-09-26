@@ -3,7 +3,9 @@
 namespace App\Actions;
 
 use App\Exceptions\StepException;
+use App\Support\CommandLog;
 use App\Support\Databases;
+use App\Support\ProcessError;
 use Dotenv\Dotenv;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
@@ -42,10 +44,10 @@ class ImportServerDatabase
 
         $process = Process::fromShellCommandline($this->pipeline($host, $dump, $this->localImport($engine, $localName)));
         $process->setTimeout(3600);
-        $process->run();
+        app(CommandLog::class)->run($process);
 
         if (! $process->isSuccessful()) {
-            throw new StepException("Importing {$database['name']} failed: ".trim($process->getErrorOutput()));
+            throw new StepException("Importing {$database['name']} failed: ".ProcessError::message($process));
         }
     }
 
@@ -62,6 +64,8 @@ class ImportServerDatabase
         if ($credentials === null) {
             return 'sudo mysqldump -u root '.$options.' | gzip';
         }
+
+        app(CommandLog::class)->hide($credentials['DB_PASSWORD']);
 
         return 'MYSQL_PWD='.escapeshellarg($credentials['DB_PASSWORD']).' mysqldump --host=127.0.0.1 --user='.escapeshellarg($credentials['DB_USERNAME']).' '.$options.' | gzip';
     }
@@ -136,16 +140,16 @@ class ImportServerDatabase
 
     private function preparePostgres(string $localName): void
     {
-        if (Process::fromShellCommandline('command -v psql')->run() !== 0) {
+        if (! app(CommandLog::class)->run(Process::fromShellCommandline('command -v psql'))->isSuccessful()) {
             throw new StepException('psql is not installed. Start PostgreSQL in Herd (Services) or install the PostgreSQL client.');
         }
 
         foreach ($this->postgresRecreate($localName) as $command) {
             $process = Process::fromShellCommandline($command);
-            $process->run();
+            app(CommandLog::class)->run($process);
 
             if (! $process->isSuccessful()) {
-                throw new StepException('Could not create local PostgreSQL database: '.trim($process->getErrorOutput()));
+                throw new StepException('Could not create local PostgreSQL database: '.ProcessError::message($process));
             }
         }
     }

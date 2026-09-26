@@ -95,6 +95,8 @@ Rocket detects the type of project on the server by itself:
 
 ## Commands
 
+Add `-v` (or `--verbose`) to `rocket install`, `rocket db:import` or `rocket env:pull` to see what happens: every step on its own line, every command Rocket runs locally or over SSH, and what it prints. Database passwords are masked and the contents of env files are never shown. With `--json`, this goes to stderr so stdout stays one JSON document.
+
 ### `rocket install`
 
 Sets up a complete local copy of an environment, found by its slug in any of your teams.
@@ -111,7 +113,7 @@ Everything comes from the API and from the environment's first connected server,
 4. Pulls the env file (or `wp-config.php`) as the environment's own user and changes it for local use: the database points at `127.0.0.1` with your local user, and a server `DB_SOCKET` is cleared
 5. Imports the MySQL and PostgreSQL databases on your own servers. With several, it asks whether to import one or all of them, and with all, which one is the main connection. The main database is imported as `{name}` and `DB_CONNECTION` points at it; the others keep their remote name
 6. Isolates the PHP version with `herd isolate` (never `herd use`)
-7. Runs `composer install`, `php artisan migrate --force` and `npm install`, then `npm run build` (or `prod`, or `production`, whichever script comes first; skipped when there is none). npm runs after `nvm use` when there's an `.nvmrc`, and each step only when the project has it
+7. Runs `composer install`, `php artisan migrate --force` and `npm install`, then `npm run build` (or `prod`, or `production`, whichever script comes first; skipped when there is none). npm runs after `nvm use` when there's an `.nvmrc` (in the project or above it), with the nvm in `$NVM_DIR`, Herd's, `~/.nvm` or Homebrew's, and installs that Node version when it's missing. Each step only runs when the project has it
 8. Secures the site with HTTPS, at `https://{name}.test`
 
 Without a terminal (or with `--json`), Rocket imports the database named in the remote `DB_DATABASE`. Pass `--database=<name>` to pick one, or `--all` to import them all (with `--database=` naming the main one).

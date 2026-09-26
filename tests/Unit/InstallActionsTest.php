@@ -7,10 +7,12 @@ use App\Actions\LocalRepositoryName;
 use App\Actions\NpmBuild;
 use App\Actions\NpmInstall;
 use App\Actions\PrepareLocalRepository;
-use App\Actions\RunMigrations;
 use App\Actions\SetEnvValues;
 use App\Exceptions\StepException;
+use App\Support\CommandLog;
+use App\Support\ProcessError;
 use Illuminate\Filesystem\Filesystem;
+use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Process\Process;
 
 it('names the local project after the slug without its label', function (array $environment, string $name): void {
@@ -52,7 +54,20 @@ it('points the env at the local database server of the engine', function (): voi
         ->and((new ConfigureDotEnvLocally)->handle("DB_CONNECTION=mysql\nDB_SOCKET=/var/run/mysqld/mysqld.sock\n", 'routine'))->toContain("DB_SOCKET=\n")->not->toContain('mysqld.sock');
 });
 
+function fakeNvm(): string
+{
+    $nvm = sys_get_temp_dir().'/rocket-nvm-'.uniqid();
+    mkdir($nvm);
+    touch("{$nvm}/nvm.sh");
+    putenv("NVM_DIR={$nvm}");
+
+    return $nvm;
+}
+
+afterEach(fn () => putenv('NVM_DIR'));
+
 it('uses nvm only when the project pins a Node version, and never starts a dev server', function (): void {
+    $nvm = fakeNvm();
     $directory = sys_get_temp_dir().'/rocket-npm-'.uniqid();
     mkdir($directory);
 
@@ -60,17 +75,47 @@ it('uses nvm only when the project pins a Node version, and never starts a dev s
 
     touch("{$directory}/.nvmrc");
 
-    expect((new NpmInstall)->command($directory))->toContain('nvm use && npm install')->not->toContain('npm run dev');
+    expect((new NpmInstall)->command($directory))
+        ->toBe("export NVM_DIR='{$nvm}' && . '{$nvm}/nvm.sh' && { nvm use || nvm install; } && npm install")
+        ->not->toContain('npm run dev');
 
     (new Filesystem)->deleteDirectory($directory);
+    (new Filesystem)->deleteDirectory($nvm);
 });
 
+it('finds the nvm of Herd when NVM_DIR is not set', function (): void {
+    $home = getenv('HOME');
+    $fakeHome = sys_get_temp_dir().'/rocket-home-'.uniqid();
+    mkdir("{$fakeHome}/Library/Application Support/Herd/config/nvm", 0755, true);
+    touch("{$fakeHome}/Library/Application Support/Herd/config/nvm/nvm.sh");
+    putenv("HOME={$fakeHome}");
+
+    expect((new NpmInstall)->nvm())->toBe(["{$fakeHome}/Library/Application Support/Herd/config/nvm", "{$fakeHome}/Library/Application Support/Herd/config/nvm/nvm.sh"]);
+
+    putenv("HOME={$home}");
+    (new Filesystem)->deleteDirectory($fakeHome);
+});
+
+it('says so when the project pins a Node version but there is no nvm', function (): void {
+    $home = getenv('HOME');
+    $directory = sys_get_temp_dir().'/rocket-npm-'.uniqid();
+    mkdir($directory);
+    touch("{$directory}/.nvmrc");
+    putenv("HOME={$directory}");
+
+    expect(fn () => (new NpmInstall)->command($directory))->toThrow(StepException::class, 'nvm was not found');
+
+    putenv("HOME={$home}");
+    (new Filesystem)->deleteDirectory($directory);
+})->skip(is_file('/opt/homebrew/opt/nvm/nvm.sh') || is_file('/usr/local/opt/nvm/nvm.sh'), 'nvm is installed with Homebrew here');
+
 it('uses nvm when a parent directory pins a Node version, like in a monorepo', function (): void {
+    fakeNvm();
     $root = sys_get_temp_dir().'/rocket-npm-'.uniqid();
     mkdir("{$root}/apps/api", 0755, true);
     touch("{$root}/.nvmrc");
 
-    expect((new NpmInstall)->command("{$root}/apps/api"))->toContain('nvm use && npm install');
+    expect((new NpmInstall)->command("{$root}/apps/api"))->toEndWith('{ nvm use || nvm install; } && npm install');
 
     (new Filesystem)->deleteDirectory($root);
 });
@@ -101,11 +146,12 @@ it('skips the build without running npm when there is no build script', function
 });
 
 it('runs the build script through nvm when the project pins a Node version', function (): void {
+    fakeNvm();
     $directory = sys_get_temp_dir().'/rocket-npm-build-'.uniqid();
     mkdir($directory);
     touch("{$directory}/.nvmrc");
 
-    expect((new NpmInstall)->command($directory, 'npm run build'))->toEndWith('nvm use && npm run build');
+    expect((new NpmInstall)->command($directory, 'npm run build'))->toEndWith('{ nvm use || nvm install; } && npm run build');
 
     (new Filesystem)->deleteDirectory($directory);
 });
@@ -163,9 +209,30 @@ it('clones a repository on its branch, then stashes, checks out and pulls on the
     (new Filesystem)->deleteDirectory($root);
 });
 
-it('shows the artisan error from stdout when migrations fail', function (): void {
+it('shows the error from stdout when a process prints it there, like artisan and nvm', function (): void {
     $process = Process::fromShellCommandline("printf '\\n   Illuminate\\\\Database\\\\QueryException \\n\\n  SQLSTATE[HY000] [2002] No such file or directory\\n\\n  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:760\\n'; exit 1");
     $process->run();
 
-    expect((new RunMigrations)->errorMessage($process))->toBe('Illuminate\\Database\\QueryException SQLSTATE[HY000] [2002] No such file or directory');
+    $silent = Process::fromShellCommandline('exit 3');
+    $silent->run();
+
+    expect(ProcessError::message($process))->toBe('Illuminate\\Database\\QueryException SQLSTATE[HY000] [2002] No such file or directory')
+        ->and(ProcessError::message($silent))->toBe('exit code 3 without output');
+});
+
+it('logs commands and their output only when verbose, masking secrets and hidden output', function (): void {
+    $log = new CommandLog;
+    $quiet = $log->run(Process::fromShellCommandline('echo hello'));
+
+    $output = new BufferedOutput;
+    $log->enable($output);
+    $log->hide('s3cr3t');
+    $log->step('Importing routine');
+    $log->run(Process::fromShellCommandline("echo one; echo two >&2; MYSQL_PWD='s3cr3t' true"));
+    $log->run(Process::fromShellCommandline('echo APP_KEY=base64:secret'), showOutput: false);
+    $log->run(Process::fromShellCommandline('exit 4'));
+
+    expect($quiet->getOutput())->toBe("hello\n")
+        ->and($output->fetch())->toContain('→ Importing routine', '$ echo one; echo two >&2; MYSQL_PWD=\'***\' true', '│ one', '│ two', '(output hidden)', 'exit code 4')
+        ->not->toContain('s3cr3t', 'APP_KEY');
 });

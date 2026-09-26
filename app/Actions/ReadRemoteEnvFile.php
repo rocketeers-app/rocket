@@ -35,7 +35,7 @@ class ReadRemoteEnvFile
 
     private function read(string $host, string $slug, string $path): ?string
     {
-        $process = (new CreateSshConnection)($host, $slug)->execute('cat '.escapeshellarg($path).' 2>/dev/null');
+        $process = (new CreateSshConnection)($host, $slug)->hideOutput()->execute('cat '.escapeshellarg($path).' 2>/dev/null');
         $output = $process->getOutput();
 
         return $process->isSuccessful() && trim($output) !== '' ? $output : null;

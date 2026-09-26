@@ -3,9 +3,13 @@
 namespace App\Commands\Concerns;
 
 use App\Exceptions\StepException;
+use App\Support\CommandLog;
 use Symfony\Component\Console\Helper\ProgressBar;
 
-/** A progress bar per command; silent under --json. A failing step closes the bar and lets the error through. */
+/**
+ * A progress bar per command; silent under --json. A failing step closes the bar and lets the error through.
+ * With --verbose there is no bar: each step is a line, followed by the commands it runs and their output.
+ */
 trait WithSteps
 {
     protected ?ProgressBar $progressBar = null;
@@ -26,6 +30,7 @@ trait WithSteps
 
     protected function step(string $message, callable $callback): mixed
     {
+        app(CommandLog::class)->step($message);
         $this->progressBar?->setMessage($message.'...');
         $this->progressBar?->display();
 
@@ -57,6 +62,6 @@ trait WithSteps
 
     private function quietSteps(): bool
     {
-        return method_exists($this, 'wantsJson') && $this->wantsJson();
+        return (method_exists($this, 'wantsJson') && $this->wantsJson()) || app(CommandLog::class)->enabled();
     }
 }

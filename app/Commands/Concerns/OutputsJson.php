@@ -4,11 +4,13 @@ namespace App\Commands\Concerns;
 
 use App\Exceptions\ApiException;
 use App\Exceptions\StepException;
+use App\Support\CommandLog;
 use App\Support\OutputRenderer;
 use Laravel\Prompts\Prompt;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 
 /**
@@ -50,6 +52,10 @@ trait OutputsJson
         if ($input->hasOption('json') && $input->getOption('json')) {
             $input->setInteractive(false);
             Prompt::interactive(false);
+        }
+
+        if ($output->isVerbose()) {
+            app(CommandLog::class)->enable($this->wantsJson() && $output instanceof SymfonyStyle ? $output->getErrorStyle() : $output);
         }
     }
 

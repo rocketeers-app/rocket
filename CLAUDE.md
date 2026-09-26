@@ -32,6 +32,7 @@
 
 ## Key conventions
 - Every command has `--json`: stdout then carries exactly one JSON document and nothing prompts
+- Run local processes through `app(CommandLog::class)->run($process)` and SSH through `CreateSshConnection` (a `LoggedSsh`), so `-v` shows each command and its output; `hide()` secrets and `hideOutput()` on SSH reads of env files. Failure messages use `ProcessError::message()` (stderr, else stdout, never empty)
 - Tests: `composer test` (Pest, Saloon `MockClient::global`, the bundled snapshot); `tests/.home` stands in for `~`
 - `db:import {environment}` finds the environment by slug across every team, imports only MySQL/PostgreSQL that run on one of the team's servers (never ClickHouse, Tinybird, PlanetScale, RDS or other external databases), dumps each on the server it lives on, and asks which one when there are several (`--all` takes every one)
 - `install {environment}` reads everything from `environments:read` and the first connected server (no `--server`/`--php`): local name is the slug minus `-{label}`, in `config('rocketeers.projects_path')` (`/var/www`); the main database is imported as that name and `DB_CONNECTION` points at it. With a `root_directory` (monorepo) the whole repository is cloned into `{projects_path}/{repository}` (`LocalRepositoryName`, from the clone URL), the app is installed in its root directory and named after its basename, the directory around it is parked in Herd, and switching the branch of an existing clone asks first (stops under `--json`)
