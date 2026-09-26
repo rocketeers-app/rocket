@@ -9,9 +9,9 @@ class CreateSshConnection
 {
     use AsAction;
 
-    public function handle(string $server): Ssh
+    public function handle(string $server, string $user = 'rocketeer'): Ssh
     {
-        return Ssh::create('rocketeer', $server)
+        return Ssh::create($user, $server)
             ->disableStrictHostKeyChecking()
             ->addExtraOption('-o LogLevel=ERROR');
     }
