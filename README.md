@@ -210,7 +210,7 @@ Rocket keeps its own settings in `~/.rocketeers/.env`:
 API_TOKEN=your-rocketeers-api-token
 ```
 
-To use a different token, run `rocket login` again. Rocket talks to `https://app.rocketeersapp.com/api/v1` by default; set `API_URL` in the same file to point it somewhere else.
+To use a different token, run `rocket login` again. Rocket talks to `https://api.rocketeersapp.com/v1` by default; set `API_URL` in the same file to point it somewhere else.
 
 ## Troubleshooting
 
