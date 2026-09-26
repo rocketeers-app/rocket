@@ -34,6 +34,16 @@ class ImportRemoteDatabase
         return $credentials;
     }
 
+    /** @return array{DB_HOST: string, DB_DATABASE: string, DB_USERNAME: string, DB_PASSWORD: string} */
+    public function fetchConnection(string $site, string $server): array
+    {
+        if ((new IsWordPress)($site, $server) && ! (new IsBedrock)($site, $server)) {
+            return $this->fetchWordPressCredentials($site, $server);
+        }
+
+        return $this->fetchEnvCredentials($site, $server);
+    }
+
     protected function fetchEnvCredentials($site, $server): array
     {
         $envVars = [

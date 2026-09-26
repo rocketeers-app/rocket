@@ -12,17 +12,19 @@ use App\Actions\GetRepositoryName;
 use App\Actions\GetRepositoryUrl;
 use App\Actions\GitCloneRepository;
 use App\Actions\ImportRemoteDatabase;
-use App\Actions\IsWordPress;
 use App\Actions\IsolatePhpVersion;
+use App\Actions\IsWordPress;
 use App\Actions\NpmInstall;
 use App\Actions\PutEnvLocally;
 use App\Actions\RunMigrations;
 use App\Actions\SecureSite;
+use App\Commands\Concerns\OutputsJson;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 
 class Install extends Command
 {
+    use OutputsJson;
     use WithSteps;
 
     protected $signature = 'install {site} {--server=} {--php=8.0}';
@@ -39,6 +41,7 @@ class Install extends Command
             return $this->call('sync', [
                 'site' => $site,
                 '--server' => $server,
+                '--json' => $this->wantsJson(),
             ]);
         }
 
@@ -70,7 +73,13 @@ class Install extends Command
 
         $this->finishProgress();
 
+        if ($this->wantsJson()) {
+            return $this->emitJson(['site' => $site, 'server' => $server, 'name' => $name, 'branch' => $branch, 'url' => "https://{$name}.test"]);
+        }
+
         $this->line('');
         $this->info("View in browser: https://{$name}.test");
+
+        return self::SUCCESS;
     }
 }

@@ -3,6 +3,8 @@
 namespace App\Commands;
 
 use App\Actions\CreateSshConnection;
+use App\Commands\Concerns\OutputsJson;
+use App\Exceptions\StepException;
 use Illuminate\Console\Command;
 use Symfony\Component\Process\Process;
 
@@ -10,6 +12,8 @@ use function Laravel\Prompts\select;
 
 class TailLog extends Command
 {
+    use OutputsJson;
+
     protected $signature = 'tail {site} {--server=}';
 
     protected $description = 'Tail a log file on the remote server';
@@ -25,9 +29,7 @@ class TailLog extends Command
         $output = trim($process->getOutput());
 
         if (empty($output)) {
-            $this->error('No log files found.');
-
-            return 1;
+            throw new StepException('No log files found.');
         }
 
         $files = collect(explode("\n", $output))
@@ -37,9 +39,11 @@ class TailLog extends Command
             ->all();
 
         if (empty($files)) {
-            $this->error('No log files found.');
+            throw new StepException('No log files found.');
+        }
 
-            return 1;
+        if ($this->wantsJson()) {
+            return $this->emitJson(['files' => $files]);
         }
 
         $basePaths = [

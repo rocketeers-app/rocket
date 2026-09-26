@@ -3,30 +3,27 @@
 namespace App\Commands;
 
 use App\Actions\GetCurrentSshConfig;
-use App\Actions\RequestApi;
+use App\Actions\SendApiRequest;
+use App\Api\Requests\GetSshConfig;
+use App\Commands\Concerns\OutputsJson;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 use Symfony\Component\Process\Process;
 
 class SshConfig extends Command
 {
+    use OutputsJson;
     use WithSteps;
 
     protected $signature = 'ssh:config';
 
     protected $description = 'Update your local SSH config with all sites and servers';
 
-    public function handle()
+    public function handle(): int
     {
-        if (blank(config('rocketeers.api_token'))) {
-            $this->error('No Rocketeers token configured. '.RequestApi::SETUP_HINT);
-
-            return self::FAILURE;
-        }
-
         $this->startProgress(2);
 
-        $sshConfig = $this->step('Fetching SSH config', fn () => (new RequestApi)('ssh/config')->body());
+        $sshConfig = $this->step('Fetching SSH config', fn () => (new SendApiRequest)(new GetSshConfig)->body());
 
         $this->step('Updating local SSH config', function () use ($sshConfig) {
             $delimiter = '### ROCKETEERS APP ###';
@@ -45,5 +42,7 @@ class SshConfig extends Command
         });
 
         $this->finishProgress();
+
+        return $this->wantsJson() ? $this->emitJson(['config' => $sshConfig]) : self::SUCCESS;
     }
 }

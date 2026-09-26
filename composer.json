@@ -1,20 +1,30 @@
 {
     "name": "rocketeers-app/rocket",
     "description": "The Command Line Interface for Rocketeers",
-    "keywords": ["rocketeers", "cli", "rocket"],
+    "keywords": [
+        "rocketeers",
+        "cli",
+        "rocket"
+    ],
     "homepage": "https://rocketeers.app",
     "type": "project",
     "license": "MIT",
     "require": {
-        "php": "^8.2",
+        "php": "^8.4",
         "guzzlehttp/guzzle": "^7.9",
         "illuminate/http": "^12.0",
         "laravel-zero/framework": "^12.0",
         "laravel-zero/phar-updater": "^1.4",
         "laravel/pint": "^1.18",
         "lorisleiva/laravel-actions": "^2.8",
+        "saloonphp/pagination-plugin": "^2.3",
+        "saloonphp/saloon": "^4.3",
         "spatie/ssh": "^1.10",
         "symfony/process": "^7.4.5"
+    },
+    "require-dev": {
+        "mockery/mockery": "^1.6",
+        "pestphp/pest": "^4.7"
     },
     "autoload": {
         "psr-4": {
@@ -29,12 +39,16 @@
     "config": {
         "preferred-install": "dist",
         "sort-packages": true,
-        "optimize-autoloader": true
+        "optimize-autoloader": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
     },
     "scripts": {
         "post-create-project-cmd": [
             "@php application app:rename"
-        ]
+        ],
+        "test": "pest"
     },
     "minimum-stability": "dev",
     "prefer-stable": true,

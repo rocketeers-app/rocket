@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Api\Requests\GetMe;
 use App\Exceptions\StepException;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -11,7 +12,7 @@ class FetchCurrentUser
 
     public function handle(?string $token = null): array
     {
-        $json = (new RequestApi)('me', $token)->json();
+        $json = (new SendApiRequest)(new GetMe, $token)->json();
         $user = $json['data'] ?? $json;
 
         if (! is_array($user) || blank($user['email'] ?? null)) {

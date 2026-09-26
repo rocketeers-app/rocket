@@ -11,11 +11,13 @@ use App\Actions\IsWordPress;
 use App\Actions\NotifyLocally;
 use App\Actions\PutEnvLocally;
 use App\Actions\PutWpConfigLocally;
+use App\Commands\Concerns\OutputsJson;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 
 class EnvPull extends Command
 {
+    use OutputsJson;
     use WithSteps;
 
     protected $signature = 'env:pull {site} {--server=}';
@@ -47,6 +49,12 @@ class EnvPull extends Command
 
         $this->finishProgress();
 
+        if ($this->wantsJson()) {
+            return $this->emitJson(['site' => $site, 'server' => $server, 'wordpress' => $isWordPress]);
+        }
+
         (new NotifyLocally)("Env pulled for {$site}", $this);
+
+        return self::SUCCESS;
     }
 }

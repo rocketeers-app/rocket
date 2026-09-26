@@ -15,11 +15,13 @@ use App\Actions\PutEnvLocally;
 use App\Actions\PutWpConfigLocally;
 use App\Actions\RsyncSite;
 use App\Actions\SecureSite;
+use App\Commands\Concerns\OutputsJson;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 
 class Sync extends Command
 {
+    use OutputsJson;
     use WithSteps;
 
     protected $signature = 'sync {site} {--server=}';
@@ -57,9 +59,15 @@ class Sync extends Command
 
         $this->finishProgress();
 
+        if ($this->wantsJson()) {
+            return $this->emitJson(['site' => $site, 'server' => $server, 'name' => $name, 'url' => "https://{$name}.test"]);
+        }
+
         (new NotifyLocally)("Site {$site} is now in sync.", $this);
 
         $this->line('');
         $this->info("View in browser: https://{$name}.test");
+
+        return self::SUCCESS;
     }
 }

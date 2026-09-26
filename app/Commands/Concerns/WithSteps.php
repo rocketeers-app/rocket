@@ -5,12 +5,17 @@ namespace App\Commands\Concerns;
 use App\Exceptions\StepException;
 use Symfony\Component\Console\Helper\ProgressBar;
 
+/** A progress bar per command; silent under --json. A failing step closes the bar and lets the error through. */
 trait WithSteps
 {
     protected ?ProgressBar $progressBar = null;
 
     protected function startProgress(int $totalSteps): void
     {
+        if ($this->quietSteps()) {
+            return;
+        }
+
         ProgressBar::setFormatDefinition('custom', ' %current%/%max% [%bar%] %message%');
 
         $this->progressBar = $this->output->createProgressBar($totalSteps);
@@ -21,28 +26,37 @@ trait WithSteps
 
     protected function step(string $message, callable $callback): mixed
     {
-        $this->progressBar->setMessage($message.'...');
-        $this->progressBar->display();
+        $this->progressBar?->setMessage($message.'...');
+        $this->progressBar?->display();
 
         try {
             $result = $callback();
-        } catch (StepException $e) {
-            $this->finishProgress();
-            $this->newLine();
-            $this->error($e->getMessage());
+        } catch (StepException $exception) {
+            $this->progressBar?->clear();
+            $this->progressBar = null;
 
-            exit(1);
+            throw $exception;
         }
 
-        $this->progressBar->advance();
+        $this->progressBar?->advance();
 
         return $result;
     }
 
     protected function finishProgress(): void
     {
+        if ($this->progressBar === null) {
+            return;
+        }
+
         $this->progressBar->setMessage('Done!');
         $this->progressBar->finish();
+        $this->progressBar = null;
         $this->newLine();
+    }
+
+    private function quietSteps(): bool
+    {
+        return method_exists($this, 'wantsJson') && $this->wantsJson();
     }
 }

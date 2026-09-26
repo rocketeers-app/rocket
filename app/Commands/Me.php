@@ -3,12 +3,13 @@
 namespace App\Commands;
 
 use App\Actions\FetchCurrentUser;
-use App\Actions\RequestApi;
+use App\Commands\Concerns\OutputsJson;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 
 class Me extends Command
 {
+    use OutputsJson;
     use WithSteps;
 
     protected $signature = 'me';
@@ -17,21 +18,23 @@ class Me extends Command
 
     public function handle(): int
     {
-        if (blank(config('rocketeers.api_token'))) {
-            $this->error('No Rocketeers token configured. '.RequestApi::SETUP_HINT);
-
-            return self::FAILURE;
-        }
-
         $this->startProgress(1);
 
         $user = $this->step('Fetching your account', fn () => (new FetchCurrentUser)());
 
         $this->finishProgress();
 
+        if ($this->wantsJson()) {
+            return $this->emitJson($user);
+        }
+
         $this->newLine();
-        $this->components->twoColumnDetail('Name', $user['name'] ?? '');
+        $this->components->twoColumnDetail('Name', trim(($user['name'] ?? '') ?: ($user['firstname'] ?? '').' '.($user['lastname'] ?? '')));
         $this->components->twoColumnDetail('Email', $user['email']);
+
+        if (filled(config('rocketeers.default_team'))) {
+            $this->components->twoColumnDetail('Team', (string) config('rocketeers.default_team'));
+        }
 
         return self::SUCCESS;
     }

@@ -2,34 +2,174 @@
 
 namespace App\Commands;
 
-use App\Actions\ImportRemoteDatabase;
-use App\Actions\NotifyLocally;
+use App\Actions\FindEnvironmentAcrossTeams;
+use App\Actions\ImportServerDatabase;
+use App\Api\ApiErrorPresenter;
+use App\Commands\Concerns\OutputsJson;
 use App\Commands\Concerns\WithSteps;
+use App\Exceptions\ApiException;
+use App\Exceptions\StepException;
+use App\Schema\Operation;
+use App\Schema\SchemaCache;
+use App\Support\Databases;
+use App\Support\PermissionGate;
+use App\Support\RecordFinder;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 
+use function Laravel\Prompts\select;
+
+/**
+ * Imports an environment's databases into local ones, found by slug across every team you are in.
+ * Each database is dumped on the server it lives on; with several, you pick one, or take --all.
+ */
 class ImportDatabase extends Command
 {
+    use OutputsJson;
     use WithSteps;
 
-    protected $signature = 'db:import {site} {--server=} {--user=rocketeer}';
+    protected $signature = 'db:import
+        {environment : The environment slug}
+        {--database= : Import only this database, by name}
+        {--all : Import every MySQL and PostgreSQL database of the environment}
+        {--as= : Name of the local database (when importing one)}
+        {--team= : Only look in this team}';
 
-    protected $description = 'Import database';
+    protected $description = 'Import an environment\'s MySQL or PostgreSQL databases locally';
 
-    public function handle()
+    public function handle(): int
     {
-        $site = $this->argument('site');
-        $server = $this->option('server') ?? $site;
+        if (blank(config('rocketeers.api_token'))) {
+            throw ApiErrorPresenter::missingToken();
+        }
 
-        $action = new ImportRemoteDatabase;
+        $slug = (string) $this->argument('environment');
+        ['team' => $team, 'environment' => $environment] = (new FindEnvironmentAcrossTeams)($slug, $this->canPrompt(), $this->option('team'));
 
-        $this->startProgress(3);
+        $pathValues = ['team' => (string) $team['slug'], 'environment' => (string) $environment['id']];
+        $databases = collect(app(RecordFinder::class)->all($this->operation('api.team.environments.databases.index', $team), $pathValues));
 
-        $credentials = $this->step('Fetching remote credentials', fn () => $action->fetchCredentials($site, $server));
-        $this->step('Preparing local database', fn () => $action->prepareLocalDatabase($credentials['name']));
-        $this->step('Importing remote database', fn () => $action->importDatabase($credentials, $server));
+        [$importable, $skipped] = $databases->partition(fn (array $database): bool => Databases::isImportable($database));
+
+        if (! $this->wantsJson() && $skipped->isNotEmpty()) {
+            $this->newLine();
+            $this->components->warn('Skipping '.$skipped->map(fn (array $database): string => "{$database['name']} (".Databases::label($database).')')->implode(', ').': only MySQL and PostgreSQL on your own servers can be imported.');
+        }
+
+        if ($importable->isEmpty()) {
+            throw new ApiException("{$environment['name']} has no MySQL or PostgreSQL database on one of your servers.", 404);
+        }
+
+        $chosen = $this->choose($importable->values());
+
+        if ($chosen->count() > 1 && filled($this->option('as'))) {
+            throw new ApiException('--as names one local database; leave it out when importing several.', 422);
+        }
+
+        $credentialHosts = $chosen->contains(fn (array $database): bool => Databases::engine($database) === 'mysql')
+            ? $this->serverHosts($team, $pathValues)
+            : [];
+
+        $this->startProgress($chosen->count());
+
+        $imported = $chosen->map(function (array $database) use ($slug, $credentialHosts): array {
+            $local = (string) ($this->option('as') ?: $database['name']);
+
+            $this->step("Importing {$database['name']} from ".Databases::host($database), fn () => app(ImportServerDatabase::class)->handle($database, $slug, $credentialHosts, $local));
+
+            return [
+                'name' => $database['name'],
+                'engine' => Databases::engine($database),
+                'server' => Databases::host($database),
+                'local' => $local,
+            ];
+        });
 
         $this->finishProgress();
 
-        (new NotifyLocally)("Database is imported for {$site}", $this);
+        if ($this->wantsJson()) {
+            return $this->emitJson([
+                'team' => $team['slug'],
+                'environment' => $slug,
+                'imported' => $imported->values()->all(),
+                'skipped' => $skipped->map(fn (array $database): array => ['name' => $database['name'], 'type' => Databases::label($database)])->values()->all(),
+            ]);
+        }
+
+        $this->newLine();
+
+        foreach ($imported as $database) {
+            $this->line("  <fg=green>✓</> {$database['name']} → local <fg=cyan>{$database['local']}</> <fg=gray>(".($database['engine'] === 'pgsql' ? 'PostgreSQL' : 'MySQL')." from {$database['server']})</>");
+        }
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $importable
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function choose(Collection $importable): Collection
+    {
+        if ($this->option('all')) {
+            return $importable;
+        }
+
+        if (filled($this->option('database'))) {
+            $match = $importable->where('name', $this->option('database'))->values();
+
+            if ($match->isEmpty()) {
+                throw new ApiException("No importable database `{$this->option('database')}`. Choose from: ".$importable->pluck('name')->implode(', ').'.', 404);
+            }
+
+            return $match;
+        }
+
+        if ($importable->count() === 1) {
+            return $importable;
+        }
+
+        if (! $this->canPrompt()) {
+            throw new ApiException('This environment has several databases: '.$importable->pluck('name')->implode(', ').'. Pass --database=<name> or --all.', 409);
+        }
+
+        $index = select(
+            label: 'Which database do you want to import?',
+            options: $importable->mapWithKeys(fn (array $database, int $index): array => ["#{$index}" => Databases::display($database)])->all(),
+            hint: 'Use --all to import every one of them',
+        );
+
+        return collect([$importable[(int) ltrim((string) $index, '#')]]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $team
+     * @param  array<string, string>  $pathValues
+     * @return array<int, string>
+     */
+    private function serverHosts(array $team, array $pathValues): array
+    {
+        $list = app(SchemaCache::class)->findByRoute('api.team.environments.servers.index');
+
+        if ($list === null || ! app(PermissionGate::class)->allows($list, $team)) {
+            return [];
+        }
+
+        return collect(app(RecordFinder::class)->all($list, $pathValues))
+            ->map(fn (array $server): ?string => Databases::host(['server' => $server]))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /** @param array<string, mixed> $team */
+    private function operation(string $route, array $team): Operation
+    {
+        $operation = app(SchemaCache::class)->findByRoute($route)
+            ?? throw new StepException('This version of the API cannot list databases. Run `rocket api:refresh`.');
+
+        app(PermissionGate::class)->ensure($operation, $team);
+
+        return $operation;
     }
 }
