@@ -6,6 +6,7 @@ use App\Actions\ImportServerDatabase;
 use App\Actions\IsolatePhpVersion;
 use App\Actions\NpmBuild;
 use App\Actions\NpmInstall;
+use App\Actions\ParkDirectory;
 use App\Actions\PrepareLocalRepository;
 use App\Actions\ReadRemoteEnvFile;
 use App\Actions\RunMigrations;
@@ -71,7 +72,7 @@ function installMock(string $class): MockInterface
     return $mock;
 }
 
-function recordInstallSteps(object $test, bool $dirty = false): void
+function recordInstallSteps(object $test, bool $dirty = false, string $currentBranch = 'main'): void
 {
     $record = function (string $step) use ($test): Closure {
         return function (...$arguments) use ($test, $step): void {
@@ -81,6 +82,7 @@ function recordInstallSteps(object $test, bool $dirty = false): void
 
     $repository = installMock(PrepareLocalRepository::class);
     $repository->shouldReceive('isDirty')->andReturn($dirty);
+    $repository->shouldReceive('currentBranch')->andReturn($currentBranch);
     $repository->shouldReceive('handle')->andReturnUsing(function (...$arguments) use ($test): string {
         $test->calls[] = ['repository', $arguments];
 
@@ -93,6 +95,7 @@ function recordInstallSteps(object $test, bool $dirty = false): void
 
     foreach ([
         'database' => ImportServerDatabase::class,
+        'park' => ParkDirectory::class,
         'isolate' => IsolatePhpVersion::class,
         'composer' => ComposerInstall::class,
         'migrate' => RunMigrations::class,
@@ -120,6 +123,7 @@ it('installs an environment into a directory named after its slug without the la
             'team' => 'acme',
             'environment' => 'routine-production',
             'path' => $this->directory,
+            'repository_path' => $this->directory,
             'url' => 'https://routine.test',
             'databases' => [['name' => 'routine_prod', 'engine' => 'mysql', 'server' => '10.0.0.9', 'local' => 'routine', 'main' => true]],
         ])
@@ -259,6 +263,95 @@ it('asks for --database or --all when several databases match nothing and it can
 
     expect($code)->toBe(1)
         ->and(json_decode($output, true)['error']['message'])->toContain('several databases: ledger, events', '--database=<name> or --all')
+        ->and($this->calls)->toBe([]);
+});
+
+function installMonorepo(object $test): string
+{
+    $directory = $test->projects.'/monorepo/apps/api';
+    (new Filesystem)->ensureDirectoryExists($directory);
+
+    foreach (['composer.json', 'artisan', 'package.json'] as $file) {
+        touch("{$directory}/{$file}");
+    }
+
+    installApi([installDatabase('routine_prod', 'mysql_native')], [
+        'root_directory' => '/apps/api/',
+        'repository' => ['id' => 'repo-1', 'ssh_url' => 'git@github.com:acme/monorepo.git'],
+    ]);
+
+    return $directory;
+}
+
+it('installs an environment in a monorepo in its root directory, named after it and parked in Herd', function (): void {
+    $directory = installMonorepo($this);
+    recordInstallSteps($this);
+
+    [$code, $output] = runCommand('install', ['environment' => 'routine-production', '--json' => true]);
+
+    expect($code)->toBe(0)
+        ->and(json_decode($output, true))->toMatchArray([
+            'path' => $directory,
+            'repository_path' => $this->projects.'/monorepo',
+            'url' => 'https://api.test',
+            'databases' => [['name' => 'routine_prod', 'engine' => 'mysql', 'server' => '10.0.0.9', 'local' => 'api', 'main' => true]],
+        ])
+        ->and(installSteps($this->calls))->toBe(['repository', 'database', 'park', 'isolate', 'composer', 'migrate', 'npm', 'build', 'secure'])
+        ->and($this->calls[0][1])->toBe([$this->projects.'/monorepo', 'git@github.com:acme/monorepo.git', 'main', false])
+        ->and($this->calls[2][1])->toBe([$this->projects.'/monorepo/apps'])
+        ->and($this->calls[3][1])->toBe(['api', '8.3', $directory])
+        ->and($this->calls[6][1])->toBe(['api', $directory])
+        ->and($this->calls[8][1])->toBe(['api', $directory]);
+
+    expect(file_get_contents("{$directory}/.env"))->toContain('APP_URL=https://api.test', 'DB_DATABASE=api')
+        ->and(file_exists($this->projects.'/monorepo/.env'))->toBeFalse();
+});
+
+it('runs npm install at the repository root when it has workspaces', function (): void {
+    $directory = installMonorepo($this);
+    file_put_contents($this->projects.'/monorepo/package.json', json_encode(['workspaces' => ['apps/*']]));
+    recordInstallSteps($this);
+
+    [$code] = runCommand('install', ['environment' => 'routine-production', '--json' => true]);
+
+    $calls = array_column($this->calls, 1, 0);
+
+    expect($code)->toBe(0)
+        ->and($calls['npm'])->toBe(['api', $this->projects.'/monorepo'])
+        ->and($calls['build'])->toBe([$directory]);
+});
+
+it('switches the branch of a monorepo when you say so', function (): void {
+    installMonorepo($this);
+    recordInstallSteps($this, currentBranch: 'develop');
+
+    $this->artisan('install', ['environment' => 'routine-production'])
+        ->expectsConfirmation("{$this->projects}/monorepo is on develop. Switch it to main? This affects every app in the repository.", 'yes')
+        ->assertSuccessful();
+
+    expect($this->calls[0])->toBe(['repository', [$this->projects.'/monorepo', 'git@github.com:acme/monorepo.git', 'main', false]]);
+});
+
+it('stops without touching anything when you keep the branch of a monorepo', function (): void {
+    installMonorepo($this);
+    recordInstallSteps($this, currentBranch: 'develop');
+
+    $this->artisan('install', ['environment' => 'routine-production'])
+        ->expectsConfirmation("{$this->projects}/monorepo is on develop. Switch it to main? This affects every app in the repository.", 'no')
+        ->expectsOutputToContain('Stopped')
+        ->assertFailed();
+
+    expect($this->calls)->toBe([]);
+});
+
+it('refuses to switch the branch of a monorepo when it cannot ask', function (): void {
+    installMonorepo($this);
+    recordInstallSteps($this, currentBranch: 'develop');
+
+    [$code, $output] = runCommand('install', ['environment' => 'routine-production', '--json' => true]);
+
+    expect($code)->toBe(1)
+        ->and(json_decode($output, true)['error']['message'])->toContain('is on develop, not main')
         ->and($this->calls)->toBe([]);
 });
 

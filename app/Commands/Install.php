@@ -12,8 +12,10 @@ use App\Actions\GetRemoteRepositoryUrl;
 use App\Actions\ImportServerDatabase;
 use App\Actions\IsolatePhpVersion;
 use App\Actions\LocalProjectName;
+use App\Actions\LocalRepositoryName;
 use App\Actions\NpmBuild;
 use App\Actions\NpmInstall;
+use App\Actions\ParkDirectory;
 use App\Actions\PrepareLocalRepository;
 use App\Actions\PutEnvLocally;
 use App\Actions\PutWpConfigLocally;
@@ -40,6 +42,9 @@ use function Laravel\Prompts\confirm;
  * Installs an environment locally, found by slug across every team you are in: clones (or updates) its
  * repository into {projects_path}/{name}, pulls its env file from the first connected server, imports its
  * databases, isolates its PHP version, installs its dependencies, migrates and secures https://{name}.test.
+ * An environment in a monorepo (a root directory like `apps/api`) clones the whole repository into
+ * {projects_path}/{repository}, installs in its root directory, named after that directory's last part,
+ * and parks the directory around it in Herd.
  */
 class Install extends Command
 {
@@ -67,12 +72,16 @@ class Install extends Command
         $pathValues = ['team' => (string) $team['slug'], 'environment' => (string) $environment['id']];
 
         $name = app(LocalProjectName::class)->handle($environment);
-        $directory = rtrim((string) config('rocketeers.projects_path'), '/').'/'.$name;
         $remoteDirectory = $environment['directory_path'] ?? null;
 
         $server = app(FindConnectedServer::class)->handle($team, $environment);
         $url = $environment['repository']['ssh_url'] ?? app(GetRemoteRepositoryUrl::class)->handle($server, $slug, $remoteDirectory);
         $branch = filled($environment['branch'] ?? null) ? (string) $environment['branch'] : null;
+
+        $rootDirectory = trim((string) ($environment['root_directory'] ?? ''), '/') ?: null;
+        $projectsPath = rtrim((string) config('rocketeers.projects_path'), '/');
+        $repositoryDirectory = $projectsPath.'/'.($rootDirectory === null ? $name : app(LocalRepositoryName::class)->handle($url));
+        $directory = $rootDirectory === null ? $repositoryDirectory : "{$repositoryDirectory}/{$rootDirectory}";
 
         $file = ($environment['supports_env_file'] ?? true)
             ? app(ReadRemoteEnvFile::class)->handle($server, $slug, $remoteDirectory)
@@ -80,16 +89,17 @@ class Install extends Command
 
         ['databases' => $databases, 'main' => $main] = $this->chooseDatabases($team, $pathValues, $file);
 
-        $stash = $this->shouldStash($directory);
+        $switch = $rootDirectory === null || $this->shouldSwitchBranch($repositoryDirectory, $branch);
+        $stash = $switch ? $this->shouldStash($repositoryDirectory) : null;
 
         if ($stash === null) {
-            $this->components->warn("Stopped: nothing in {$directory} was changed.");
+            $this->components->warn("Stopped: nothing in {$repositoryDirectory} was changed.");
 
             return self::FAILURE;
         }
 
         $steps = [
-            [$branch === null ? 'Preparing the repository' : "Preparing the repository on {$branch}", fn () => app(PrepareLocalRepository::class)->handle($directory, $url, $branch, $stash)],
+            [$branch === null ? 'Preparing the repository' : "Preparing the repository on {$branch}", fn () => app(PrepareLocalRepository::class)->handle($repositoryDirectory, $url, $branch, $stash)],
         ];
 
         if ($file !== null) {
@@ -108,7 +118,7 @@ class Install extends Command
             $steps[] = ["Importing {$database['name']} from {$database['server']}", fn () => app(ImportServerDatabase::class)->handle($databases->values()[$index], $slug, [$server], $database['local'], $remoteDirectory)];
         }
 
-        $steps = [...$steps, ...$this->projectSteps($environment, $name, $directory)];
+        $steps = [...$steps, ...$this->projectSteps($environment, $name, $directory, $repositoryDirectory, $rootDirectory !== null)];
 
         $this->startProgress(count($steps));
 
@@ -125,6 +135,7 @@ class Install extends Command
                 'team' => $team['slug'],
                 'environment' => $slug,
                 'path' => $directory,
+                'repository_path' => $repositoryDirectory,
                 'url' => $siteUrl,
                 'databases' => $imported->all(),
             ]);
@@ -191,6 +202,21 @@ class Install extends Command
         return Dotenv::parse($file['contents'])['DB_DATABASE'] ?? null;
     }
 
+    private function shouldSwitchBranch(string $repositoryDirectory, ?string $branch): bool
+    {
+        $current = $branch === null ? null : app(PrepareLocalRepository::class)->currentBranch($repositoryDirectory);
+
+        if ($current === null || $current === $branch) {
+            return true;
+        }
+
+        if (! $this->canPrompt()) {
+            throw new StepException("{$repositoryDirectory} is on {$current}, not {$branch}. Switch it yourself, or run `rocket install` interactively to switch it.");
+        }
+
+        return confirm(label: "{$repositoryDirectory} is on {$current}. Switch it to {$branch}? This affects every app in the repository.", default: false);
+    }
+
     private function shouldStash(string $directory): ?bool
     {
         $repository = app(PrepareLocalRepository::class);
@@ -222,10 +248,15 @@ class Install extends Command
         return app(PutEnvLocally::class)->handle($env, $name, $directory);
     }
 
-    private function projectSteps(array $environment, string $name, string $directory): array
+    private function projectSteps(array $environment, string $name, string $directory, string $repositoryDirectory, bool $inMonorepo): array
     {
         $steps = [];
         $phpVersion = $environment['php_version'] ?? null;
+
+        if ($inMonorepo) {
+            $parent = dirname($directory);
+            $steps[] = ["Parking {$parent} in Herd", fn () => app(ParkDirectory::class)->handle($parent)];
+        }
 
         if (($environment['is_php_based'] ?? false) && filled($phpVersion)) {
             $steps[] = ["Isolating PHP {$phpVersion}", fn () => app(IsolatePhpVersion::class)->handle($name, (string) $phpVersion, $directory)];
@@ -233,10 +264,21 @@ class Install extends Command
 
         $steps[] = ['Running composer install', fn () => file_exists("{$directory}/composer.json") ? app(ComposerInstall::class)->handle($name, $directory) : null];
         $steps[] = ['Running migrations', fn () => file_exists("{$directory}/artisan") ? app(RunMigrations::class)->handle($name, $directory) : null];
-        $steps[] = ['Running npm install', fn () => file_exists("{$directory}/package.json") ? app(NpmInstall::class)->handle($name, $directory) : null];
+        $steps[] = ['Running npm install', fn () => file_exists("{$directory}/package.json") ? app(NpmInstall::class)->handle($name, $this->usesWorkspaces($repositoryDirectory) ? $repositoryDirectory : $directory) : null];
         $steps[] = ['Building frontend assets', fn () => file_exists("{$directory}/package.json") ? app(NpmBuild::class)->handle($directory) : null];
         $steps[] = ['Securing the site', fn () => app(SecureSite::class)->handle($name, $directory)];
 
         return $steps;
+    }
+
+    private function usesWorkspaces(string $repositoryDirectory): bool
+    {
+        if (! file_exists("{$repositoryDirectory}/package.json")) {
+            return false;
+        }
+
+        $package = json_decode((string) file_get_contents("{$repositoryDirectory}/package.json"), true);
+
+        return is_array($package) && filled($package['workspaces'] ?? null);
     }
 }

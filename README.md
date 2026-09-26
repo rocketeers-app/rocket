@@ -105,14 +105,24 @@ Everything comes from the API and from the environment's first connected server,
 
 1. Reads the environment: PHP version, branch, label, directory and repository. Without a repository in Rocketeers, it reads the git origin of the current release over SSH
 2. Picks the local name: the slug without its label (`routine-production` becomes `routine`), installed in `/var/www/{name}`
-3. Clones the repository on the environment's branch. If it's already cloned, it fetches, checks out the branch and pulls (fast-forward only). With local changes, it asks to stash them first, and stops if you say no
-4. Pulls the env file (or `wp-config.php`) as the environment's own user and changes it for local use
+3. Clones the repository on the environment's branch. If it's already cloned, it fetches, checks out the environment's branch (the repository's default branch when the environment has none), even when the clone is on another one, and fast-forwards it to origin. It stops when the branch isn't on origin or can't be fast-forwarded. With local changes, it asks to stash them first, and stops if you say no
+4. Pulls the env file (or `wp-config.php`) as the environment's own user and changes it for local use: the database points at `127.0.0.1` with your local user, and a server `DB_SOCKET` is cleared
 5. Imports the MySQL and PostgreSQL databases on your own servers. With several, it asks whether to import one or all of them, and with all, which one is the main connection. The main database is imported as `{name}` and `DB_CONNECTION` points at it; the others keep their remote name
 6. Isolates the PHP version with `herd isolate` (never `herd use`)
 7. Runs `composer install`, `php artisan migrate --force` and `npm install`, then `npm run build` (or `prod`, or `production`, whichever script comes first; skipped when there is none). npm runs after `nvm use` when there's an `.nvmrc`, and each step only when the project has it
 8. Secures the site with HTTPS, at `https://{name}.test`
 
 Without a terminal (or with `--json`), Rocket imports the database named in the remote `DB_DATABASE`. Pass `--database=<name>` to pick one, or `--all` to import them all (with `--database=` naming the main one).
+
+#### Monorepos
+
+When the environment has a root directory (like `apps/api`), Rocket clones the whole repository and installs the app in that directory:
+
+- The repository goes into `/var/www/{repository}`, named after its clone URL (`git@github.com:acme/monorepo.git` becomes `/var/www/monorepo`). The app lives in `/var/www/monorepo/apps/api`
+- The local name is the last part of the root directory (`api`), so the main database is imported as `api` and the env file is written to `apps/api/.env`
+- Rocket runs `herd park` in the directory around the app (`/var/www/monorepo/apps`), so the site is `https://api.test`, next to any other app in that directory
+- When the repository is already cloned on another branch, Rocket asks before switching it, because that affects every app in the repository. Without a terminal (or with `--json`), it stops instead
+- `npm install` runs at the repository root when its `package.json` has `workspaces`, else in the app. An `.nvmrc` at the repository root counts too
 
 ### `rocket sync`
 

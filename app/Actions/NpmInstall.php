@@ -25,10 +25,23 @@ class NpmInstall
 
     public function command(string $directory, string $npm = 'npm install'): string
     {
-        if (! file_exists("{$directory}/.nvmrc")) {
+        if (! $this->pinsNodeVersion($directory)) {
             return $npm;
         }
 
         return 'export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use && '.$npm;
+    }
+
+    private function pinsNodeVersion(string $directory): bool
+    {
+        while (! file_exists("{$directory}/.nvmrc")) {
+            if (dirname($directory) === $directory) {
+                return false;
+            }
+
+            $directory = dirname($directory);
+        }
+
+        return true;
     }
 }

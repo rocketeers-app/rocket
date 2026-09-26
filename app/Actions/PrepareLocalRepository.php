@@ -3,10 +3,14 @@
 namespace App\Actions;
 
 use App\Exceptions\StepException;
+use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
-/** Clones a repository into a local directory, or brings an existing clone to the branch: stash when asked, fetch, checkout, fast-forward pull. */
+/**
+ * Clones a repository into a local directory, or brings an existing clone to the branch (the remote's default
+ * branch when there is none): stash when asked, fetch, check out the branch, fast-forward it to origin.
+ */
 class PrepareLocalRepository
 {
     use AsAction;
@@ -27,13 +31,23 @@ class PrepareLocalRepository
             $this->git($directory, ['stash', 'push', '-u', '-m', 'rocket install']);
         }
 
-        $this->git($directory, ['fetch']);
+        $this->git($directory, ['fetch', 'origin', '--prune']);
 
-        if ($branch !== null) {
-            $this->git($directory, ['checkout', $branch]);
+        $branch ??= $this->defaultBranch($directory);
+
+        if (! $this->succeeds($directory, ['rev-parse', '--verify', '--quiet', "refs/remotes/origin/{$branch}"])) {
+            throw new StepException("The branch {$branch} is not on origin of {$directory}.");
         }
 
-        $this->git($directory, ['pull', '--ff-only']);
+        $this->git($directory, $this->succeeds($directory, ['rev-parse', '--verify', '--quiet', "refs/heads/{$branch}"])
+            ? ['checkout', $branch]
+            : ['checkout', '-b', $branch, '--track', "origin/{$branch}"]);
+
+        if ($this->currentBranch($directory) !== $branch) {
+            throw new StepException("Could not check out {$branch} in {$directory}.");
+        }
+
+        $this->git($directory, ['merge', '--ff-only', "origin/{$branch}"]);
 
         return 'updated';
     }
@@ -46,6 +60,29 @@ class PrepareLocalRepository
     public function isDirty(string $directory): bool
     {
         return $this->isCloned($directory) && trim($this->git($directory, ['status', '--porcelain'])) !== '';
+    }
+
+    public function currentBranch(string $directory): ?string
+    {
+        if (! $this->isCloned($directory)) {
+            return null;
+        }
+
+        return trim($this->git($directory, ['rev-parse', '--abbrev-ref', 'HEAD'])) ?: null;
+    }
+
+    private function defaultBranch(string $directory): string
+    {
+        if (! $this->succeeds($directory, ['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD'])) {
+            $this->git($directory, ['remote', 'set-head', 'origin', '--auto']);
+        }
+
+        return Str::after(trim($this->git($directory, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])), 'origin/');
+    }
+
+    private function succeeds(string $directory, array $arguments): bool
+    {
+        return (new Process(['git', ...$arguments], $directory))->run() === 0;
     }
 
     private function git(string $directory, array $arguments): string

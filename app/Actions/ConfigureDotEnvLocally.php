@@ -19,6 +19,7 @@ class ConfigureDotEnvLocally
         $env = preg_replace('/^DB_DATABASE=(.*)/m', 'DB_DATABASE='.$name, $env);
         $env = preg_replace('/^DB_HOST=(.*)/m', 'DB_HOST=127.0.0.1', $env);
         $env = preg_replace('/^DB_PASSWORD=(.*)/m', 'DB_PASSWORD=', $env);
+        $env = preg_replace('/^DB_SOCKET=(.*)/m', 'DB_SOCKET=', $env);
         $env = preg_replace('/^DB_PORT=(.*)/m', 'DB_PORT='.($engine === 'pgsql' ? '5432' : '3306'), $env);
         $env = preg_replace('/^DB_USERNAME=(.+)/m', 'DB_USERNAME='.($engine === 'pgsql' ? config('rocketeers.local_pgsql_user') : 'root'), $env);
         $env = preg_replace('/^SESSION_DOMAIN=(.+)/m', '', $env);
