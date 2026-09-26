@@ -4,6 +4,7 @@ use App\Actions\ComposerInstall;
 use App\Actions\GetRemoteRepositoryUrl;
 use App\Actions\ImportServerDatabase;
 use App\Actions\IsolatePhpVersion;
+use App\Actions\NpmBuild;
 use App\Actions\NpmInstall;
 use App\Actions\PrepareLocalRepository;
 use App\Actions\ReadRemoteEnvFile;
@@ -96,6 +97,7 @@ function recordInstallSteps(object $test, bool $dirty = false): void
         'composer' => ComposerInstall::class,
         'migrate' => RunMigrations::class,
         'npm' => NpmInstall::class,
+        'build' => NpmBuild::class,
         'secure' => SecureSite::class,
     ] as $step => $action) {
         installMock($action)->shouldReceive('handle')->andReturnUsing($record($step));
@@ -121,7 +123,7 @@ it('installs an environment into a directory named after its slug without the la
             'url' => 'https://routine.test',
             'databases' => [['name' => 'routine_prod', 'engine' => 'mysql', 'server' => '10.0.0.9', 'local' => 'routine', 'main' => true]],
         ])
-        ->and(installSteps($this->calls))->toBe(['repository', 'database', 'isolate', 'composer', 'migrate', 'npm', 'secure'])
+        ->and(installSteps($this->calls))->toBe(['repository', 'database', 'isolate', 'composer', 'migrate', 'npm', 'build', 'secure'])
         ->and($this->calls[0][1])->toBe([$this->directory, 'git@github.com:acme/routine.git', 'main', false])
         ->and($this->calls[1][1])->toBe([installDatabase('routine_prod', 'mysql_native'), 'routine-production', ['10.0.0.2'], 'routine', '/home/routine-production/webroot'])
         ->and($this->calls[2][1])->toBe(['routine', '8.3', $this->directory]);

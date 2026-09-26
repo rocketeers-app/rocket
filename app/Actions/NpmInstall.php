@@ -23,12 +23,12 @@ class NpmInstall
         }
     }
 
-    public function command(string $directory): string
+    public function command(string $directory, string $npm = 'npm install'): string
     {
         if (! file_exists("{$directory}/.nvmrc")) {
-            return 'npm install';
+            return $npm;
         }
 
-        return 'export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use && npm install';
+        return 'export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use && '.$npm;
     }
 }

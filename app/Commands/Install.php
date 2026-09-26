@@ -12,6 +12,7 @@ use App\Actions\GetRemoteRepositoryUrl;
 use App\Actions\ImportServerDatabase;
 use App\Actions\IsolatePhpVersion;
 use App\Actions\LocalProjectName;
+use App\Actions\NpmBuild;
 use App\Actions\NpmInstall;
 use App\Actions\PrepareLocalRepository;
 use App\Actions\PutEnvLocally;
@@ -233,6 +234,7 @@ class Install extends Command
         $steps[] = ['Running composer install', fn () => file_exists("{$directory}/composer.json") ? app(ComposerInstall::class)->handle($name, $directory) : null];
         $steps[] = ['Running migrations', fn () => file_exists("{$directory}/artisan") ? app(RunMigrations::class)->handle($name, $directory) : null];
         $steps[] = ['Running npm install', fn () => file_exists("{$directory}/package.json") ? app(NpmInstall::class)->handle($name, $directory) : null];
+        $steps[] = ['Building frontend assets', fn () => file_exists("{$directory}/package.json") ? app(NpmBuild::class)->handle($directory) : null];
         $steps[] = ['Securing the site', fn () => app(SecureSite::class)->handle($name, $directory)];
 
         return $steps;

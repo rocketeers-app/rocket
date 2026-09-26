@@ -3,6 +3,7 @@
 use App\Actions\ConfigureDotEnvLocally;
 use App\Actions\ImportServerDatabase;
 use App\Actions\LocalProjectName;
+use App\Actions\NpmBuild;
 use App\Actions\NpmInstall;
 use App\Actions\PrepareLocalRepository;
 use App\Actions\SetEnvValues;
@@ -42,6 +43,41 @@ it('uses nvm only when the project pins a Node version, and never starts a dev s
     touch("{$directory}/.nvmrc");
 
     expect((new NpmInstall)->command($directory))->toContain('nvm use && npm install')->not->toContain('npm run dev');
+
+    (new Filesystem)->deleteDirectory($directory);
+});
+
+it('builds with the build script, else prod, else production, else not at all', function (array $scripts, ?string $script): void {
+    $directory = sys_get_temp_dir().'/rocket-npm-build-'.uniqid();
+    mkdir($directory);
+    file_put_contents("{$directory}/package.json", json_encode(['scripts' => $scripts]));
+
+    expect((new NpmBuild)->script($directory))->toBe($script);
+
+    (new Filesystem)->deleteDirectory($directory);
+})->with([
+    'build' => [['dev' => 'vite', 'build' => 'vite build', 'prod' => 'mix --production'], 'build'],
+    'prod' => [['dev' => 'mix', 'prod' => 'mix --production', 'production' => 'mix --production'], 'prod'],
+    'production' => [['dev' => 'mix', 'production' => 'mix --production'], 'production'],
+    'none' => [['dev' => 'vite', 'test' => 'vitest'], null],
+]);
+
+it('skips the build without running npm when there is no build script', function (): void {
+    $directory = sys_get_temp_dir().'/rocket-npm-build-'.uniqid();
+    mkdir($directory);
+    file_put_contents("{$directory}/package.json", json_encode(['scripts' => ['dev' => 'vite']]));
+
+    expect((new NpmBuild)->handle($directory))->toBeNull();
+
+    (new Filesystem)->deleteDirectory($directory);
+});
+
+it('runs the build script through nvm when the project pins a Node version', function (): void {
+    $directory = sys_get_temp_dir().'/rocket-npm-build-'.uniqid();
+    mkdir($directory);
+    touch("{$directory}/.nvmrc");
+
+    expect((new NpmInstall)->command($directory, 'npm run build'))->toEndWith('nvm use && npm run build');
 
     (new Filesystem)->deleteDirectory($directory);
 });

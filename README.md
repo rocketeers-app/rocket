@@ -109,7 +109,7 @@ Everything comes from the API and from the environment's first connected server,
 4. Pulls the env file (or `wp-config.php`) as the environment's own user and changes it for local use
 5. Imports the MySQL and PostgreSQL databases on your own servers. With several, it asks whether to import one or all of them, and with all, which one is the main connection. The main database is imported as `{name}` and `DB_CONNECTION` points at it; the others keep their remote name
 6. Isolates the PHP version with `herd isolate` (never `herd use`)
-7. Runs `composer install`, `php artisan migrate --force` and `npm install` (after `nvm use` when there's an `.nvmrc`), each only when the project has it
+7. Runs `composer install`, `php artisan migrate --force` and `npm install`, then `npm run build` (or `prod`, or `production`, whichever script comes first; skipped when there is none). npm runs after `nvm use` when there's an `.nvmrc`, and each step only when the project has it
 8. Secures the site with HTTPS, at `https://{name}.test`
 
 Without a terminal (or with `--json`), Rocket imports the database named in the remote `DB_DATABASE`. Pass `--database=<name>` to pick one, or `--all` to import them all (with `--database=` naming the main one).
