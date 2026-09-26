@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Actions\ChooseDatabases;
 use App\Actions\FindEnvironmentAcrossTeams;
 use App\Actions\ImportServerDatabase;
 use App\Api\ApiErrorPresenter;
@@ -16,9 +17,6 @@ use App\Support\PermissionGate;
 use App\Support\RecordFinder;
 use App\Support\Servers;
 use Illuminate\Console\Command;
-use Illuminate\Support\Collection;
-
-use function Laravel\Prompts\select;
 
 /**
  * Imports an environment's databases into local ones, found by slug across every team you are in.
@@ -61,7 +59,7 @@ class ImportDatabase extends Command
             throw new ApiException("{$environment['name']} has no MySQL or PostgreSQL database on one of your servers.", 404);
         }
 
-        $chosen = $this->choose($importable->values());
+        $chosen = app(ChooseDatabases::class)->handle($importable->values(), $this->canPrompt(), $this->option('database'), (bool) $this->option('all'));
 
         if ($chosen->count() > 1 && filled($this->option('as'))) {
             throw new ApiException('--as names one local database; leave it out when importing several.', 422);
@@ -73,10 +71,12 @@ class ImportDatabase extends Command
 
         $this->startProgress($chosen->count());
 
-        $imported = $chosen->map(function (array $database) use ($slug, $credentialHosts): array {
+        $directory = $environment['directory_path'] ?? null;
+
+        $imported = $chosen->map(function (array $database) use ($slug, $credentialHosts, $directory): array {
             $local = (string) ($this->option('as') ?: $database['name']);
 
-            $this->step("Importing {$database['name']} from ".Databases::host($database), fn () => app(ImportServerDatabase::class)->handle($database, $slug, $credentialHosts, $local));
+            $this->step("Importing {$database['name']} from ".Databases::host($database), fn () => app(ImportServerDatabase::class)->handle($database, $slug, $credentialHosts, $local, $directory));
 
             return [
                 'name' => $database['name'],
@@ -104,43 +104,6 @@ class ImportDatabase extends Command
         }
 
         return self::SUCCESS;
-    }
-
-    /**
-     * @param  Collection<int, array<string, mixed>>  $importable
-     * @return Collection<int, array<string, mixed>>
-     */
-    private function choose(Collection $importable): Collection
-    {
-        if ($this->option('all')) {
-            return $importable;
-        }
-
-        if (filled($this->option('database'))) {
-            $match = $importable->where('name', $this->option('database'))->values();
-
-            if ($match->isEmpty()) {
-                throw new ApiException("No importable database `{$this->option('database')}`. Choose from: ".$importable->pluck('name')->implode(', ').'.', 404);
-            }
-
-            return $match;
-        }
-
-        if ($importable->count() === 1) {
-            return $importable;
-        }
-
-        if (! $this->canPrompt()) {
-            throw new ApiException('This environment has several databases: '.$importable->pluck('name')->implode(', ').'. Pass --database=<name> or --all.', 409);
-        }
-
-        $index = select(
-            label: 'Which database do you want to import?',
-            options: $importable->mapWithKeys(fn (array $database, int $index): array => ["#{$index}" => Databases::display($database)])->all(),
-            hint: 'Use --all to import every one of them',
-        );
-
-        return collect([$importable[(int) ltrim((string) $index, '#')]]);
     }
 
     /**

@@ -10,11 +10,11 @@ class IsolatePhpVersion
 {
     use AsAction;
 
-    public function handle($name, $phpVersion)
+    public function handle($name, $phpVersion, ?string $directory = null)
     {
         $herdOrValet = (new UseHerdOrValet)();
 
-        $process = Process::fromShellCommandline(command: "{$herdOrValet} isolate php@{$phpVersion}", cwd: "/var/www/{$name}");
+        $process = Process::fromShellCommandline(command: "{$herdOrValet} isolate php@{$phpVersion}", cwd: $directory ?? "/var/www/{$name}");
         $process->setTimeout(300);
         $process->run();
 

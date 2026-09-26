@@ -10,11 +10,11 @@ class RunMigrations
 {
     use AsAction;
 
-    public function handle($name)
+    public function handle($name, ?string $directory = null)
     {
         $herdOrValet = (new UseHerdOrValet)();
 
-        $process = Process::fromShellCommandline(command: "{$herdOrValet} php artisan migrate --force", cwd: "/var/www/{$name}");
+        $process = Process::fromShellCommandline(command: "{$herdOrValet} php artisan migrate --force", cwd: $directory ?? "/var/www/{$name}");
         $process->setTimeout(300);
         $process->run();
 

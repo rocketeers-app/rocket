@@ -4,13 +4,14 @@ namespace App\Actions;
 
 use App\Exceptions\StepException;
 use App\Support\Databases;
+use Dotenv\Dotenv;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Process\Process;
 
 /**
  * Streams one database from the server it lives on into a local database of the same engine.
  * PostgreSQL dumps as the postgres superuser; MySQL as root over the socket, else as the database
- * user the environment's .env (or wp-config) names.
+ * user the environment's env file (or wp-config) names, read as the environment's own user.
  */
 class ImportServerDatabase
 {
@@ -22,7 +23,7 @@ class ImportServerDatabase
      * @param  array<string, mixed>  $database
      * @param  array<int, string>  $credentialHosts
      */
-    public function handle(array $database, string $environment, array $credentialHosts, string $localName): void
+    public function handle(array $database, string $environment, array $credentialHosts, string $localName, ?string $directory = null): void
     {
         $engine = Databases::engine($database);
         $host = Databases::host($database);
@@ -33,7 +34,7 @@ class ImportServerDatabase
 
         $dump = $engine === 'pgsql'
             ? $this->postgresDump((string) $database['name'])
-            : $this->mysqlDump((string) $database['name'], $this->mysqlCredentials($host, $environment, $credentialHosts));
+            : $this->mysqlDump((string) $database['name'], $this->mysqlCredentials($host, $environment, $credentialHosts, $directory));
 
         $engine === 'pgsql'
             ? $this->preparePostgres($localName)
@@ -79,11 +80,7 @@ class ImportServerDatabase
         return 'set -o pipefail; '.self::SSH.' '.escapeshellarg('rocketeer@'.$host).' '.escapeshellarg($dump).' | gunzip | '.$import;
     }
 
-    /**
-     * @param  array<int, string>  $credentialHosts
-     * @return array{DB_USERNAME: string, DB_PASSWORD: string}|null
-     */
-    private function mysqlCredentials(string $host, string $environment, array $credentialHosts): ?array
+    private function mysqlCredentials(string $host, string $environment, array $credentialHosts, ?string $directory): ?array
     {
         $root = (new CreateSshConnection)($host)->execute('sudo mysql -u root -e "SELECT 1" >/dev/null 2>&1 && echo yes || echo no');
 
@@ -93,13 +90,36 @@ class ImportServerDatabase
 
         foreach (array_values(array_unique([$host, ...$credentialHosts])) as $server) {
             try {
-                return (new ImportRemoteDatabase)->fetchConnection($environment, $server);
+                $credentials = $this->credentialsFrom(app(ReadRemoteEnvFile::class)->handle($server, $environment, $directory));
             } catch (StepException) {
                 continue;
             }
+
+            if ($credentials !== null) {
+                return $credentials;
+            }
         }
 
-        throw new StepException("MySQL on {$host} does not let root in over the socket, and no server of {$environment} has a .env naming its database user.");
+        throw new StepException("MySQL on {$host} does not let root in over the socket, and no server of {$environment} has an env file naming its database user.");
+    }
+
+    public function credentialsFrom(array $file): ?array
+    {
+        $values = $file['wordpress'] ? $this->wordPressDefines($file['contents']) : Dotenv::parse($file['contents']);
+        $username = $values['DB_USERNAME'] ?? $values['DB_USER'] ?? '';
+
+        if ($username === '') {
+            return null;
+        }
+
+        return ['DB_USERNAME' => $username, 'DB_PASSWORD' => (string) ($values['DB_PASSWORD'] ?? '')];
+    }
+
+    private function wordPressDefines(string $config): array
+    {
+        preg_match_all('/define\s*\(\s*[\'"](DB_USER|DB_PASSWORD)[\'"]\s*,\s*[\'"](.*?)[\'"]\s*\)/', $config, $matches, PREG_SET_ORDER);
+
+        return collect($matches)->mapWithKeys(fn (array $match): array => [$match[1] => $match[2]])->all();
     }
 
     /** @return array<int, string> */

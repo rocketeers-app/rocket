@@ -95,23 +95,24 @@ Rocket detects the type of project on the server by itself:
 
 ### `rocket install`
 
-Sets up a complete local copy of a site from scratch.
+Sets up a complete local copy of an environment, found by its slug in any of your teams.
 
 ```bash
-rocket install {site} [--server=] [--php=8.0]
+rocket install {environment} [--database=] [--all] [--team=]
 ```
 
-For Laravel projects, it:
+Everything comes from the API and from the environment's first connected server, so there's no `--server` or `--php`. Rocket:
 
-1. Reads the repository URL, repository name and current branch from the server
-2. Clones the repository to `/var/www/{name}` and checks out that branch (skipped if it's already cloned)
-3. Isolates the PHP version with `herd isolate` or `valet isolate` (`--php`, default `8.0`)
-4. Pulls the remote `.env` and changes it for local use
-5. Creates a new local database and imports the remote database into it
-6. Runs `composer install`, `php artisan migrate --force`, `nvm install`, `npm install` and `npm run dev`
-7. Secures the site with HTTPS
+1. Reads the environment: PHP version, branch, label, directory and repository. Without a repository in Rocketeers, it reads the git origin of the current release over SSH
+2. Picks the local name: the slug without its label (`routine-production` becomes `routine`), installed in `/var/www/{name}`
+3. Clones the repository on the environment's branch. If it's already cloned, it fetches, checks out the branch and pulls (fast-forward only). With local changes, it asks to stash them first, and stops if you say no
+4. Pulls the env file (or `wp-config.php`) as the environment's own user and changes it for local use
+5. Imports the MySQL and PostgreSQL databases on your own servers. With several, it asks whether to import one or all of them, and with all, which one is the main connection. The main database is imported as `{name}` and `DB_CONNECTION` points at it; the others keep their remote name
+6. Isolates the PHP version with `herd isolate` (never `herd use`)
+7. Runs `composer install`, `php artisan migrate --force` and `npm install` (after `nvm use` when there's an `.nvmrc`), each only when the project has it
+8. Secures the site with HTTPS, at `https://{name}.test`
 
-WordPress sites don't have a git-based install. For those, `rocket install` runs [`rocket sync`](#rocket-sync) instead.
+Without a terminal (or with `--json`), Rocket imports the database named in the remote `DB_DATABASE`. Pass `--database=<name>` to pick one, or `--all` to import them all (with `--database=` naming the main one).
 
 ### `rocket sync`
 

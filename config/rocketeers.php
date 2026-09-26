@@ -14,4 +14,6 @@ return [
     'teams_max_age' => 60 * 10,
 
     'local_pgsql_user' => env('LOCAL_PGSQL_USER', 'root'),
+
+    'projects_path' => env('ROCKET_PROJECTS_PATH', '/var/www'),
 ];

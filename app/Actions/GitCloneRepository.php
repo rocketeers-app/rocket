@@ -10,13 +10,15 @@ class GitCloneRepository
 {
     use AsAction;
 
-    public function handle($name, $url)
+    public function handle($name, $url, ?string $directory = null, ?string $branch = null)
     {
-        if (is_dir("/var/www/{$name}/.git")) {
+        $directory ??= "/var/www/{$name}";
+
+        if (is_dir("{$directory}/.git")) {
             return;
         }
 
-        $process = new Process(['git', 'clone', $url, '/var/www/'.$name]);
+        $process = new Process(['git', 'clone', ...($branch === null ? [] : ['--branch', $branch]), $url, $directory]);
         $process->setTimeout(300);
         $process->run();
 
