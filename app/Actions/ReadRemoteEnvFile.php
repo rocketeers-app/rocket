@@ -12,21 +12,21 @@ class ReadRemoteEnvFile
 
     private const array WORDPRESS_CONFIGS = ['current/wp-config.php', 'current/public/wp-config.php', 'current/config/application.php'];
 
-    /** @return array{contents: string, wordpress: bool, repository: string} */
+    /** @return array{contents: string, wordpress: bool} */
     public function handle(string $host, string $slug, ?string $directory = null): array
     {
         $directory ??= "/home/{$slug}/webroot";
         $env = $this->read($host, $slug, "{$directory}/persistent/.env");
 
         if ($env !== null) {
-            return ['contents' => $env, 'wordpress' => false, 'repository' => $this->repository($host, $slug, $directory)];
+            return ['contents' => $env, 'wordpress' => false];
         }
 
         foreach (self::WORDPRESS_CONFIGS as $config) {
             $contents = $this->read($host, $slug, "{$directory}/{$config}");
 
             if ($contents !== null) {
-                return ['contents' => $contents, 'wordpress' => true, 'repository' => $slug];
+                return ['contents' => $contents, 'wordpress' => true];
             }
         }
 
@@ -39,13 +39,5 @@ class ReadRemoteEnvFile
         $output = $process->getOutput();
 
         return $process->isSuccessful() && trim($output) !== '' ? $output : null;
-    }
-
-    private function repository(string $host, string $slug, string $directory): string
-    {
-        $process = (new CreateSshConnection)($host, $slug)->execute('git -C '.escapeshellarg("{$directory}/current").' config --get remote.origin.url 2>/dev/null');
-        $url = trim($process->getOutput());
-
-        return $url === '' ? (string) preg_replace('/-[a-z]+$/', '', $slug) : str_replace('.git', '', basename($url));
     }
 }

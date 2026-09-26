@@ -8,8 +8,12 @@ class PutEnvLocally
 {
     use AsAction;
 
-    public function handle($env, $name)
+    public function handle($env, $name, ?string $directory = null): string
     {
-        file_put_contents("/var/www/{$name}/.env", $env);
+        $path = ($directory ?? "/var/www/{$name}").'/.env';
+
+        file_put_contents($path, $env);
+
+        return $path;
     }
 }

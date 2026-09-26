@@ -8,22 +8,26 @@ class PutWpConfigLocally
 {
     use AsAction;
 
-    public function handle($config, $name)
+    public function handle($config, $name, ?string $directory = null): string
     {
+        $directory ??= "/var/www/{$name}";
+
         $paths = [
-            "/var/www/{$name}/wp-config.php",
-            "/var/www/{$name}/public/wp-config.php",
-            "/var/www/{$name}/config/application.php",
+            "{$directory}/wp-config.php",
+            "{$directory}/public/wp-config.php",
+            "{$directory}/config/application.php",
         ];
 
         foreach ($paths as $path) {
             if (file_exists($path)) {
                 file_put_contents($path, $config);
 
-                return;
+                return $path;
             }
         }
 
-        file_put_contents("/var/www/{$name}/wp-config.php", $config);
+        file_put_contents("{$directory}/wp-config.php", $config);
+
+        return "{$directory}/wp-config.php";
     }
 }
