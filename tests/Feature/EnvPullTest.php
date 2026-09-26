@@ -42,6 +42,38 @@ it('reads the env file as the environment user from the first connected server',
     ]);
 });
 
+it('falls back to a server whose connection was never checked', function (): void {
+    envPullApi([
+        serverRecord(['name' => 'web-1', 'ip' => '10.0.0.1', 'is_connected' => false]),
+        serverRecord(['name' => 'web-2', 'ip' => null, 'ipv4_address' => '178.105.113.175', 'is_connected' => null]),
+    ]);
+
+    $this->mock(ReadRemoteEnvFile::class)->shouldReceive('handle')->once()
+        ->with('178.105.113.175', 'habits-production', '/home/habits-production/webroot')
+        ->andReturn(['contents' => "APP_ENV=production\n", 'wordpress' => false]);
+    $this->mock(PutEnvLocally::class)->shouldReceive('handle')->once()->andReturn(getcwd().'/.env');
+
+    [$code, $output] = runCommand('env:pull', ['environment' => 'habits-production', '--json' => true]);
+
+    expect($code)->toBe(0)->and(json_decode($output, true)['server'])->toBe('178.105.113.175');
+});
+
+it('prefers a connected server over one that was never checked', function (): void {
+    envPullApi([
+        serverRecord(['name' => 'web-1', 'ip' => '10.0.0.1', 'is_connected' => null]),
+        serverRecord(['name' => 'web-2', 'ip' => '10.0.0.2', 'is_connected' => true]),
+    ]);
+
+    $this->mock(ReadRemoteEnvFile::class)->shouldReceive('handle')->once()
+        ->with('10.0.0.2', 'habits-production', '/home/habits-production/webroot')
+        ->andReturn(['contents' => "APP_ENV=production\n", 'wordpress' => false]);
+    $this->mock(PutEnvLocally::class)->shouldReceive('handle')->once()->andReturn(getcwd().'/.env');
+
+    [$code, $output] = runCommand('env:pull', ['environment' => 'habits-production', '--json' => true]);
+
+    expect($code)->toBe(0)->and(json_decode($output, true)['server'])->toBe('10.0.0.2');
+});
+
 it('says so when no server of the environment is connected', function (): void {
     envPullApi([serverRecord(['ip' => '10.0.0.1', 'is_connected' => false])]);
 

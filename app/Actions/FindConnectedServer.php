@@ -26,7 +26,9 @@ class FindConnectedServer
         app(PermissionGate::class)->ensure($list, $team);
 
         $server = collect(app(RecordFinder::class)->all($list, ['team' => (string) $team['slug'], 'environment' => (string) $environment['id']]))
-            ->first(fn (array $server): bool => ($server['is_connected'] ?? false) === true && Servers::host($server) !== null);
+            ->reject(fn (array $server): bool => ($server['is_connected'] ?? null) === false || Servers::host($server) === null)
+            ->sortBy(fn (array $server): int => ($server['is_connected'] ?? null) === true ? 0 : 1)
+            ->first();
 
         if ($server === null) {
             throw new ApiException("{$environment['name']} has no connected server.", 404);
