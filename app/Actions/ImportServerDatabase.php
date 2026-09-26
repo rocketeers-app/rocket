@@ -102,17 +102,31 @@ class ImportServerDatabase
         throw new StepException("MySQL on {$host} does not let root in over the socket, and no server of {$environment} has a .env naming its database user.");
     }
 
+    /** @return array<int, string> */
+    public function postgresRecreate(string $localName): array
+    {
+        $identifier = '"'.str_replace('"', '""', $localName).'"';
+        $psql = 'psql --quiet --host=127.0.0.1 --username='.escapeshellarg((string) config('rocketeers.local_pgsql_user')).' --dbname=postgres --command=';
+
+        return [
+            $psql.escapeshellarg("DROP DATABASE IF EXISTS {$identifier} WITH (FORCE)"),
+            $psql.escapeshellarg("CREATE DATABASE {$identifier}"),
+        ];
+    }
+
     private function preparePostgres(string $localName): void
     {
-        $connection = '--host=127.0.0.1 --username='.escapeshellarg((string) config('rocketeers.local_pgsql_user'));
+        if (Process::fromShellCommandline('command -v psql')->run() !== 0) {
+            throw new StepException('psql is not installed. Start PostgreSQL in Herd (Services) or install the PostgreSQL client.');
+        }
 
-        Process::fromShellCommandline("dropdb --if-exists {$connection} ".escapeshellarg($localName).' 2>/dev/null')->run();
+        foreach ($this->postgresRecreate($localName) as $command) {
+            $process = Process::fromShellCommandline($command);
+            $process->run();
 
-        $process = Process::fromShellCommandline("createdb {$connection} ".escapeshellarg($localName));
-        $process->run();
-
-        if (! $process->isSuccessful()) {
-            throw new StepException('Could not create local PostgreSQL database: '.trim($process->getErrorOutput()));
+            if (! $process->isSuccessful()) {
+                throw new StepException('Could not create local PostgreSQL database: '.trim($process->getErrorOutput()));
+            }
         }
     }
 }

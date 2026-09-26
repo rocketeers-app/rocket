@@ -156,3 +156,10 @@ it('dumps each engine the way its server allows, escaping every value', function
         ->and($action->mysqlDump('shop', ['DB_USERNAME' => 'shop', 'DB_PASSWORD' => "it's"]))->toStartWith("MYSQL_PWD='it'\\''s' mysqldump --host=127.0.0.1 --user='shop'")
         ->and($action->pipeline('10.0.0.9', 'dump', 'import'))->toBe("set -o pipefail; ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o ServerAliveInterval=60 'rocketeer@10.0.0.9' 'dump' | gunzip | import");
 });
+
+it('recreates a local PostgreSQL database through psql alone, with the name quoted', function (): void {
+    expect((new ImportServerDatabase)->postgresRecreate('shop "prod"'))->toBe([
+        "psql --quiet --host=127.0.0.1 --username='root' --dbname=postgres --command='DROP DATABASE IF EXISTS \"shop \"\"prod\"\"\" WITH (FORCE)'",
+        "psql --quiet --host=127.0.0.1 --username='root' --dbname=postgres --command='CREATE DATABASE \"shop \"\"prod\"\"\"'",
+    ]);
+});
