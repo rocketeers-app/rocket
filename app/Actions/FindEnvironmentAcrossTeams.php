@@ -4,10 +4,10 @@ namespace App\Actions;
 
 use App\Exceptions\ApiException;
 use App\Exceptions\StepException;
+use App\Schema\Operation;
 use App\Schema\SchemaCache;
 use App\Support\PermissionGate;
 use App\Support\RecordFinder;
-use App\Support\Records;
 use App\Support\Teams;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -28,8 +28,7 @@ class FindEnvironmentAcrossTeams
             ->filter(fn (array $candidate): bool => app(PermissionGate::class)->allows($list, $candidate));
 
         $matches = $teams
-            ->flatMap(fn (array $candidate): array => collect(app(RecordFinder::class)->search($list, ['team' => (string) $candidate['slug']], $slug)['records'])
-                ->filter(fn (array $environment): bool => ($environment['slug'] ?? null) === $slug || Records::id($environment) === $slug)
+            ->flatMap(fn (array $candidate): array => collect($this->environmentsIn($list, $candidate, $slug))
                 ->map(fn (array $environment): array => ['team' => $candidate, 'environment' => $environment])
                 ->all())
             ->values();
@@ -52,5 +51,17 @@ class FindEnvironmentAcrossTeams
         );
 
         return $matches[(int) ltrim((string) $index, '#')];
+    }
+
+    /**
+     * @param  array<string, mixed>  $team
+     * @return array<int, array<string, mixed>>
+     */
+    private function environmentsIn(Operation $list, array $team, string $slug): array
+    {
+        return array_values(array_filter(
+            app(RecordFinder::class)->all($list, ['team' => (string) $team['slug']]),
+            fn (array $environment): bool => ($environment['slug'] ?? null) === $slug,
+        ));
     }
 }

@@ -81,6 +81,25 @@ it('imports every MySQL and PostgreSQL database with --all, each from its own se
         ]);
 });
 
+it('matches the environment on its slug only, never on a name that merely looks alike', function (): void {
+    $mock = fakeApi([
+        'api.team.environments.index' => fn (PendingRequest $pending) => str_contains($pending->getUrl(), '/globex/')
+            ? paginatedRecords([environmentRecord(['slug' => 'habits-production', 'name' => 'Habits']), environmentRecord(['id' => 'e2', 'slug' => 'habits', 'name' => 'habits-production'])])
+            : paginatedRecords([]),
+        'api.team.environments.databases.index' => paginatedRecords([importDatabaseRecord('habits', 'mysql_native', ['name' => 'db-1', 'ip' => '10.0.0.9'])]),
+        'api.team.environments.servers.index' => paginatedRecords([serverRecord(['ip' => '10.0.0.1'])]),
+    ]);
+
+    $this->mock(ImportServerDatabase::class)->shouldReceive('handle')->once()
+        ->withArgs(fn (array $database, string $environment) => $database['name'] === 'habits' && $environment === 'habits-production');
+
+    [$code, $output] = runCommand('db:import', ['environment' => 'habits-production']);
+
+    expect($code)->toBe(0)->and($output)->toContain('habits → local habits');
+
+    $mock->assertNotSent(fn ($request, $response) => array_key_exists('search', $response->getPendingRequest()->query()->all()));
+});
+
 it('asks which database to import when there are several', function (): void {
     fakeImportApi([
         importDatabaseRecord('shop', 'mysql_native', ['name' => 'db-1', 'ip' => '10.0.0.9']),

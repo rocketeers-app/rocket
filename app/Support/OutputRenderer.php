@@ -86,14 +86,16 @@ class OutputRenderer
         $labelKey = Records::labelKey($first);
         $scalar = array_keys(array_filter($first, fn (mixed $value): bool => is_scalar($value) || $value === null));
 
+        $identifier = $labelKey !== 'slug' && in_array('slug', $scalar, true) ? 'slug' : null;
+
         $extras = collect(self::PREFERRED_COLUMNS)
             ->filter(fn (string $column): bool => in_array($column, $scalar, true) && $column !== $labelKey)
-            ->merge(collect($scalar)->reject(fn (string $column): bool => in_array($column, ['id', 'uuid', $labelKey], true) || str_ends_with($column, '_id') || str_ends_with($column, '_at')))
+            ->merge(collect($scalar)->reject(fn (string $column): bool => in_array($column, ['id', 'uuid', 'slug', $labelKey], true) || str_ends_with($column, '_id') || str_ends_with($column, '_at')))
             ->unique()
             ->take(self::EXTRA_COLUMNS)
             ->all();
 
-        return array_values(array_filter([$labelKey, ...$extras, in_array('created_at', $scalar, true) ? 'created_at' : null]));
+        return array_values(array_filter([$labelKey, $identifier, ...$extras, in_array('created_at', $scalar, true) ? 'created_at' : null]));
     }
 
     private function cell(mixed $value, bool $long = false): string
