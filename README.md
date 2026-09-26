@@ -44,20 +44,28 @@ composer global update rocketeers-app/rocket
 
 ## Getting started
 
-### 1. Sync your SSH config
+### 1. Log in
+
+```bash
+rocket login
+```
+
+Rocket asks for your Rocketeers API token (create one in Rocketeers under **Settings, API**) and checks it right away against the `/me` endpoint. Only a token that works is saved, to `~/.rocketeers/.env`, readable by you alone. Check which account you're using at any time with `rocket me`.
+
+### 2. Sync your SSH config
 
 ```bash
 rocket ssh:config
 ```
 
-The first time you run this, Rocket asks for your Rocketeers API token and saves it to `~/.rocketeers/.env`. It then downloads the SSH host entries for all your sites and servers and writes them to `~/.ssh/config` between two `### ROCKETEERS APP ###` markers.
+If you haven't logged in yet, Rocket runs `rocket login` first. It then downloads the SSH host entries for all your sites and servers and writes them to `~/.ssh/config` between two `### ROCKETEERS APP ###` markers.
 
 > [!WARNING]
 > If `~/.ssh/config` doesn't have the Rocketeers markers yet, the file is **overwritten**. Back up any existing entries first and add them back outside the markers afterwards.
 
 Once this is done, every site has an SSH alias, so you can refer to a site by name in all the other commands.
 
-### 2. Install a site
+### 3. Install a site
 
 ```bash
 rocket install acme-production
@@ -149,9 +157,17 @@ rocket tail {site} [--server=]
 
 Rocket finds every `*.log` file in `/var/www/{site}/persistent/storage/logs` and `/var/www/{site}/logs`, lets you pick one, and runs `tail -f` on it. Press `Ctrl+C` to stop.
 
+### `rocket login`
+
+Asks for your API token, checks it against `/me` and saves it when it works. See [Getting started](#1-log-in).
+
+### `rocket me`
+
+Shows the name and email of the Rocketeers account your saved API token belongs to, and the API it talks to.
+
 ### `rocket ssh:config`
 
-Updates your local SSH config with all sites and servers from your Rocketeers account. See [Getting started](#1-sync-your-ssh-config).
+Updates your local SSH config with all sites and servers from your Rocketeers account. See [Getting started](#2-sync-your-ssh-config).
 
 ## Local configuration changes
 
@@ -194,7 +210,7 @@ Rocket keeps its own settings in `~/.rocketeers/.env`:
 API_TOKEN=your-rocketeers-api-token
 ```
 
-To use a different token, edit this file or delete the line. Rocket will ask for a new token the next time you run `rocket ssh:config`.
+To use a different token, run `rocket login` again. Rocket talks to `https://app.rocketeersapp.com/api/v1` by default; set `API_URL` in the same file to point it somewhere else.
 
 ## Troubleshooting
 

@@ -3,10 +3,9 @@
 namespace App\Commands;
 
 use App\Actions\GetCurrentSshConfig;
-use App\Actions\SetApiToken;
+use App\Actions\RequestApi;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Http;
 use Symfony\Component\Process\Process;
 
 class SshConfig extends Command
@@ -19,16 +18,13 @@ class SshConfig extends Command
 
     public function handle()
     {
-        (new SetApiToken)($this);
+        if (blank(config('rocketeers.api_token'))) {
+            $this->call('login');
+        }
 
         $this->startProgress(2);
 
-        $sshConfig = $this->step('Fetching SSH config', fn () => (string) Http::timeout(5)
-            ->withoutVerifying()
-            ->withHeaders([
-                'Authorization' => 'Bearer '.env('API_TOKEN'),
-            ])
-            ->get('https://rocketeers.app/api/v1/ssh/config'));
+        $sshConfig = $this->step('Fetching SSH config', fn () => (new RequestApi)('ssh/config')->body());
 
         $this->step('Updating local SSH config', function () use ($sshConfig) {
             $delimiter = '### ROCKETEERS APP ###';
