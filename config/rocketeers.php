@@ -16,4 +16,6 @@ return [
     'local_pgsql_user' => env('LOCAL_PGSQL_USER', 'root'),
 
     'projects_path' => env('ROCKET_PROJECTS_PATH', '/var/www'),
+
+    'deployment_poll_interval' => (int) env('ROCKET_DEPLOYMENT_POLL_INTERVAL', 1000),
 ];

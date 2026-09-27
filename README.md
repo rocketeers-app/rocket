@@ -128,6 +128,32 @@ When the environment has a root directory (like `apps/api`), Rocket clones the w
 - When the repository is already cloned on another branch, Rocket asks before switching it, because that affects every app in the repository. Without a terminal (or with `--json`), it stops instead
 - `npm install` runs at the repository root when its `package.json` has `workspaces`, else in the app. An `.nvmrc` at the repository root counts too
 
+### `rocket deploy`
+
+Deploys an environment, found by its slug in any of your teams, and follows it live until it's done.
+
+```bash
+rocket deploy {environment} [--detach] [--team=]
+rocket deployments:follow {environment} [deployment] [--team=]
+```
+
+Every finished step gets its own line, with the server in front of it when the environment has more than one. In a terminal, the steps running right now stay below them as `RUNNING` lines until they finish:
+
+```
+  Deploying acme-production (main · 5f5cdc1) to web-1, web-2
+
+  [web-1] Cloning the repository ..................................... 2s DONE
+  [web-2] Cloning the repository ..................................... 3s DONE
+  [web-2] Installing composer dependencies ........................ 2s RUNNING
+  [web-1] Running migrations ..................................... 0ms RUNNING
+```
+
+- A deployment queued behind a running one shows that it's waiting
+- When it fails, the step that broke shows `FAIL` and Rocket prints why; the exit code is 1 (also when it's cancelled)
+- `Ctrl+C` stops following; the deployment keeps running. `rocket deployments:follow {environment}` picks up the latest deployment again (or the one you name)
+- `--detach` only starts the deployment. With `--json`, stdout carries one JSON document once the deployment is done: the deployment and its steps
+- Without a terminal (CI), only finished steps are printed
+
 ### `rocket sync`
 
 Updates a local site with the files, config and database from the server.
