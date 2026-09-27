@@ -190,6 +190,36 @@ rocket env:pull {site} [--server=]
 
 This writes the remote `.env` (or `wp-config.php` for WordPress) to your local site and changes it for local use.
 
+### `rocket env:edit`
+
+Opens the env file of an environment in your editor. Close the editor and Rocket saves it to every server of the environment, then asks whether to deploy.
+
+```bash
+rocket env:edit {environment} [--deploy] [--no-deploy] [--team=]
+```
+
+```
+  Changes to acme-production:
+  + MAIL_FROM_ADDRESS
+  ~ VITE_APP_NAME
+
+ ┌ Save the env of acme-production and write it to its servers? ┐
+ │ Yes                                                          │
+ └──────────────────────────────────────────────────────────────┘
+
+  Saving on web-1 ................................................... DONE
+  Saving on web-2 ................................................... DONE
+
+  VITE_APP_NAME is read at build time, so it takes effect after a deploy.
+```
+
+- The editor is `$VISUAL`, else `$EDITOR`, else `vi`. A GUI editor needs its wait flag, like `EDITOR="code --wait"`
+- The file lives in a private temporary directory while you edit and is deleted afterwards, also when you stop with `Ctrl+C`. The summary names the keys you added, changed or removed, never their values
+- Saving writes the file to every server and reloads the app, so most changes are live without a deploy. When a key read at build time changed (like `VITE_*`), the deploy question defaults to yes; otherwise to no. Yes starts a deployment and follows it like `rocket deploy`. `--deploy` and `--no-deploy` answer it up front
+- When Rocketeers refuses the file (invalid syntax, a Laravel app without `APP_KEY`), Rocket shows why and reopens the editor with your changes. When someone changed the env while you were editing, nothing is saved: Rocket names the keys you had changed and reopens the editor with the current env
+- Needs the `secrets:reveal` permission to read the file and `secrets:update` to save it (plus `deployments:create` to deploy). Every read is logged in Rocketeers
+- It needs a terminal, so it refuses `--json`. WordPress has no env file (its configuration is in `wp-config.php`)
+
 ### `rocket tail`
 
 Follows a log file on the server in real time.

@@ -102,14 +102,19 @@ class DeploymentRenderer
         ));
     }
 
-    private function line(array $step, string $state, string $time): string
+    public static function taskLine(string $title, string $state, string $time = ''): string
     {
-        $label = $this->labelWidth === 0 ? '' : str_pad('['.($step['server']['name'] ?? 'all').']', $this->labelWidth);
-        $title = $label.$step['title'];
         $stateWidth = mb_strwidth(strip_tags($state));
         $dots = max(min((new Terminal)->getWidth(), 150) - 7 - mb_strwidth($title) - mb_strwidth($time) - $stateWidth, 1);
 
-        return '  '.OutputFormatter::escape($title).' <fg=gray>'.str_repeat('.', $dots).' '.$time.'</> '.$state;
+        return '  '.OutputFormatter::escape($title).' <fg=gray>'.str_repeat('.', $dots).($time === '' ? '' : ' '.$time).'</> '.$state;
+    }
+
+    private function line(array $step, string $state, string $time): string
+    {
+        $label = $this->labelWidth === 0 ? '' : str_pad('['.($step['server']['name'] ?? 'all').']', $this->labelWidth);
+
+        return self::taskLine($label.$step['title'], $state, $time);
     }
 
     private function duration(float $seconds): string

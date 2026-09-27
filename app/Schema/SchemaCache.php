@@ -2,12 +2,15 @@
 
 namespace App\Schema;
 
+use App\Actions\RefreshSchema;
+use App\Exceptions\StepException;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
  * The compact API schema the commands are generated from: the copy fetched into ~/.rocketeers/cache,
- * or the snapshot bundled with the build, so every command exists before the first refresh.
+ * or the snapshot bundled with the build, so every command exists before the first refresh. A command that
+ * needs an endpoint newer than that copy asks findOrRefresh(), which fetches the schema at most once per run.
  */
 class SchemaCache
 {
@@ -20,6 +23,8 @@ class SchemaCache
 
     /** @var array<string, Operation>|null */
     private ?array $operations = null;
+
+    private bool $refreshed = false;
 
     public static function bundledPath(): string
     {
@@ -43,6 +48,25 @@ class SchemaCache
     public function findByRoute(string $routeName): ?Operation
     {
         return collect($this->operations())->first(fn (Operation $operation): bool => $operation->name === $routeName);
+    }
+
+    public function findOrRefresh(string $routeName): ?Operation
+    {
+        $operation = $this->findByRoute($routeName);
+
+        if ($operation !== null || $this->refreshed) {
+            return $operation;
+        }
+
+        $this->refreshed = true;
+
+        try {
+            (new RefreshSchema)();
+        } catch (StepException) {
+            return null;
+        }
+
+        return $this->findByRoute($routeName);
     }
 
     public function listFor(Operation $operation, string $parameter): ?Operation

@@ -3,14 +3,9 @@
 namespace App\Commands;
 
 use App\Actions\FindEnvironmentAcrossTeams;
-use App\Actions\SendApiRequest;
 use App\Api\ApiErrorPresenter;
-use App\Api\Requests\CallOperation;
 use App\Commands\Concerns\FollowsDeployments;
 use App\Commands\Concerns\OutputsJson;
-use App\Exceptions\StepException;
-use App\Schema\SchemaCache;
-use App\Support\PermissionGate;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Command\SignalableCommandInterface;
 
@@ -40,19 +35,8 @@ class Deploy extends Command implements SignalableCommandInterface
 
         ['team' => $team, 'environment' => $environment] = (new FindEnvironmentAcrossTeams)($slug, $this->canPrompt(), $this->option('team'));
 
-        $deploy = app(SchemaCache::class)->findByRoute('api.team.environments.deploy')
-            ?? throw new StepException('This version of the API cannot deploy. Run `rocket api:refresh`.');
-
-        app(PermissionGate::class)->ensure($deploy, $team);
-
-        if (! $this->option('detach')) {
-            $this->deploymentStepsOperation($team);
-        }
-
-        $deployment = (array) app(SendApiRequest::class)->handle(
-            CallOperation::for($deploy, ['team' => (string) $team['slug'], 'environment' => (string) $environment['id']]),
-            teamName: $team['name'] ?? null,
-        )->json('data');
+        $deploy = $this->deployOperation($team, follow: ! $this->option('detach'));
+        $deployment = $this->startDeployment($deploy, $team, $environment);
 
         if (! $this->option('detach')) {
             return $this->followDeployment($team, $environment, (string) $deployment['id']);

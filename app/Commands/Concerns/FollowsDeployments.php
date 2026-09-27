@@ -2,7 +2,6 @@
 
 namespace App\Commands\Concerns;
 
-use App\Actions\RefreshSchema;
 use App\Actions\SendApiRequest;
 use App\Api\Requests\CallOperation;
 use App\Exceptions\StepException;
@@ -18,7 +17,7 @@ use Symfony\Component\Console\Output\ConsoleOutputInterface;
  * Follows a deployment until it is done by polling its steps once per interval (`rocket.deployment_poll_interval`,
  * in milliseconds), drawing them with the DeploymentRenderer. A few failed polls in a row are tolerated, so a
  * network hiccup doesn't stop the follow. Ctrl+C stops following; the deployment itself keeps running. When the
- * cached schema has no steps endpoint yet, it is refreshed once before giving up.
+ * cached schema has no steps endpoint yet, it is refreshed once before giving up, and before any deployment starts.
  */
 trait FollowsDeployments
 {
@@ -39,23 +38,32 @@ trait FollowsDeployments
         return $this->reportDeployment($team, $slug, $state);
     }
 
+    protected function deployOperation(array $team, bool $follow = true): Operation
+    {
+        $deploy = app(SchemaCache::class)->findByRoute('api.team.environments.deploy')
+            ?? throw new StepException('This version of the API cannot deploy. Run `rocket api:refresh`.');
+
+        app(PermissionGate::class)->ensure($deploy, $team);
+
+        if ($follow) {
+            $this->deploymentStepsOperation($team);
+        }
+
+        return $deploy;
+    }
+
+    protected function startDeployment(Operation $deploy, array $team, array $environment): array
+    {
+        return (array) app(SendApiRequest::class)->handle(
+            CallOperation::for($deploy, ['team' => (string) $team['slug'], 'environment' => (string) $environment['id']]),
+            teamName: $team['name'] ?? null,
+        )->json('data');
+    }
+
     protected function deploymentStepsOperation(array $team): Operation
     {
-        $cache = app(SchemaCache::class);
-        $steps = $cache->findByRoute('api.team.environments.deployments.steps');
-
-        if ($steps === null) {
-            try {
-                (new RefreshSchema)();
-            } catch (StepException) {
-            }
-
-            $steps = $cache->findByRoute('api.team.environments.deployments.steps');
-        }
-
-        if ($steps === null) {
-            throw new StepException('This version of the API cannot follow a deployment yet. Run `rocket deploy --detach` to only start one.');
-        }
+        $steps = app(SchemaCache::class)->findOrRefresh('api.team.environments.deployments.steps')
+            ?? throw new StepException('This version of the API cannot follow a deployment yet. Run `rocket deploy --detach` to only start one.');
 
         app(PermissionGate::class)->ensure($steps, $team);
 

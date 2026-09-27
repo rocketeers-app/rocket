@@ -24,6 +24,7 @@ class ApiErrorPresenter
             $status === 404 => new ApiException('Not found'.($teamName ? " in team {$teamName}" : '').'. Check the name or id.', $status),
             $status === 422 => new ApiException($message ?: 'Some fields are not valid.', $status, errors: self::errors($body)),
             $status === 429 => new ApiException('Too many requests. Try again in a minute.', $status),
+            $status === 503 && $message !== null => new ApiException($message, $status),
             $status >= 500 => new ApiException("Rocketeers answered with HTTP {$status}. Try again later.", $status),
             default => new ApiException($message ?: "Rocketeers answered with HTTP {$status}.", $status),
         };
