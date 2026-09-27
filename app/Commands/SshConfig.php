@@ -21,7 +21,6 @@ class SshConfig extends Command
 
     public function handle(): int
     {
-        $this->startProgress(2);
 
         $sshConfig = $this->step('Fetching SSH config', fn () => (new SendApiRequest)(new GetSshConfig)->body());
 
@@ -40,8 +39,6 @@ class SshConfig extends Command
             $process->setTimeout(300);
             $process->run();
         });
-
-        $this->finishProgress();
 
         return $this->wantsJson() ? $this->emitJson(['config' => $sshConfig]) : self::SUCCESS;
     }

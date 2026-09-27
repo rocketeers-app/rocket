@@ -245,7 +245,7 @@ php rocket list
 
 Rocket is built with [Laravel Zero](https://laravel-zero.com):
 
-- `app/Commands`: the CLI commands. They use the `WithSteps` trait to show a progress bar
+- `app/Commands`: the CLI commands. They use the `WithSteps` trait to show each step as a line (`Importing routine ........ 2s DONE`)
 - `app/Actions`: small classes that each do one thing, built on [`lorisleiva/laravel-actions`](https://laravelactions.com). When something goes wrong they throw a `StepException`, which `WithSteps` shows as a clean error message
 - Every SSH connection goes through the `CreateSshConnection` action
 

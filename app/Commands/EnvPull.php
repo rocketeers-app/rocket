@@ -35,9 +35,7 @@ class EnvPull extends Command
 
         $site = (string) $this->argument('environment');
 
-        $this->startProgress(4);
-
-        ['team' => $team, 'environment' => $environment] = $this->step('Finding the environment', fn (): array => (new FindEnvironmentAcrossTeams)($site, $this->canPrompt(), $this->option('team')));
+        ['team' => $team, 'environment' => $environment] = (new FindEnvironmentAcrossTeams)($site, $this->canPrompt(), $this->option('team'));
         $server = $this->step('Finding a connected server', fn (): string => app(FindConnectedServer::class)->handle($team, $environment));
         $file = $this->step('Fetching the remote env file', fn (): array => app(ReadRemoteEnvFile::class)->handle($server, $site, $environment['directory_path'] ?? null));
 
@@ -47,8 +45,6 @@ class EnvPull extends Command
         $path = $this->step('Saving it in '.$directory, fn (): string => $file['wordpress']
             ? app(PutWpConfigLocally::class)->handle(app(ConfigureWpConfigLocally::class)->handle($file['contents'], $local), $local, $directory)
             : app(PutEnvLocally::class)->handle(app(ConfigureDotEnvLocally::class)->handle($file['contents'], $local), $local, $directory));
-
-        $this->finishProgress();
 
         if ($this->wantsJson()) {
             return $this->emitJson(['team' => $team['slug'], 'environment' => $site, 'server' => $server, 'wordpress' => $file['wordpress'], 'path' => $path]);

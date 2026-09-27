@@ -34,8 +34,6 @@ class Sync extends Command
         $server = $this->option('server') ?? $site;
         $isWordPress = (new IsWordPress)($site, $server);
 
-        $this->startProgress(8);
-
         $name = $this->step('Fetching repository name', fn () => (new GetRepositoryName)($site, $server));
 
         $this->step('Syncing files from remote', fn () => (new RsyncSite)($name, $site, $server));
@@ -56,8 +54,6 @@ class Sync extends Command
         $this->step('Importing remote database', fn () => $importAction->importDatabase($credentials, $server));
 
         $this->step('Securing site', fn () => (new SecureSite)($name));
-
-        $this->finishProgress();
 
         if ($this->wantsJson()) {
             return $this->emitJson(['site' => $site, 'server' => $server, 'name' => $name, 'url' => "https://{$name}.test"]);

@@ -120,13 +120,9 @@ class Install extends Command
 
         $steps = [...$steps, ...$this->projectSteps($environment, $name, $directory, $repositoryDirectory, $rootDirectory !== null)];
 
-        $this->startProgress(count($steps));
-
         foreach ($steps as [$message, $callback]) {
             $this->step($message, $callback);
         }
-
-        $this->finishProgress();
 
         $siteUrl = "https://{$name}.test";
 

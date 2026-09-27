@@ -18,11 +18,8 @@ class Me extends Command
 
     public function handle(): int
     {
-        $this->startProgress(1);
 
         $user = $this->step('Fetching your account', fn () => (new FetchCurrentUser)());
-
-        $this->finishProgress();
 
         if ($this->wantsJson()) {
             return $this->emitJson($user);

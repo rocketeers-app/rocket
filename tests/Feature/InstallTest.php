@@ -11,6 +11,7 @@ use App\Actions\PrepareLocalRepository;
 use App\Actions\ReadRemoteEnvFile;
 use App\Actions\RunMigrations;
 use App\Actions\SecureSite;
+use App\Exceptions\StepException;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Artisan;
 use Mockery\MockInterface;
@@ -353,6 +354,21 @@ it('refuses to switch the branch of a monorepo when it cannot ask', function ():
     expect($code)->toBe(1)
         ->and(json_decode($output, true)['error']['message'])->toContain('is on develop, not main')
         ->and($this->calls)->toBe([]);
+});
+
+it('shows each step as a task line, and FAIL on the step that fails', function (): void {
+    installApi([installDatabase('routine_prod', 'mysql_native')]);
+    recordInstallSteps($this);
+    installMock(RunMigrations::class)->shouldReceive('handle')->andThrow(new StepException('Migrations failed: SQLSTATE[HY000] [2002]'));
+
+    [$code, $output] = runCommand('install', ['environment' => 'routine-production']);
+
+    expect($code)->toBe(1)
+        ->and($output)->toMatch('/Preparing the repository on main \.+.* DONE/')
+        ->and($output)->toMatch('/Running composer install \.+.* DONE/')
+        ->and($output)->toMatch('/Running migrations \.+.* FAIL/')
+        ->and($output)->toContain('Migrations failed: SQLSTATE[HY000] [2002]')
+        ->not->toContain('Running npm install', '[▓', '%');
 });
 
 it('shows each step on its own line instead of a progress bar with --verbose', function (): void {

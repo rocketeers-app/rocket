@@ -26,8 +26,6 @@ class SetupToken extends Command
     {
         $token = trim((string) $this->argument('token'));
 
-        $this->startProgress(4);
-
         $user = $this->step('Verifying token', fn () => (new FetchCurrentUser)($token));
 
         $this->step('Saving token', fn () => (new SaveApiToken)($token));
@@ -40,8 +38,6 @@ class SetupToken extends Command
             } catch (StepException) {
             }
         });
-
-        $this->finishProgress();
 
         $current = collect($all)->firstWhere('slug', config('rocketeers.default_team'));
         $team = $current ?? (count($all) === 1 || $this->canPrompt() ? $this->chooseTeam() : null);

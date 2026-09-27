@@ -20,11 +20,8 @@ class ApiRefresh extends Command
 
     public function handle(): int
     {
-        $this->startProgress(1);
 
         $result = $this->step('Fetching the API schema', fn (): array => (new RefreshSchema)(force: (bool) $this->option('bundle')));
-
-        $this->finishProgress();
 
         if ($this->option('bundle')) {
             $bundle = collect(json_decode((string) Storage::get(SchemaCache::PATH), true))->except(['etag', 'fetched_at'])->all();

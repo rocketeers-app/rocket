@@ -42,10 +42,8 @@ class SelfUpdate extends Command
         $phar = $installer->pharPath();
         $renderer = app(OutputRenderer::class);
 
-        $this->startProgress(2);
         $download = $this->step("Downloading Rocket {$latest}", fn (): string => $installer->download($latest, $phar));
         $this->step("Installing Rocket {$latest}", fn () => $installer->replace($download, $phar));
-        $this->finishProgress();
 
         if ($this->wantsJson()) {
             $renderer->json($this, ['current' => $current, 'latest' => $latest, 'updated' => true, 'path' => $phar]);

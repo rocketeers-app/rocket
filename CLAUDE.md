@@ -21,7 +21,7 @@
 
 ## Architecture
 - **Actions** (`app/Actions/`) — single-purpose classes using `lorisleiva/laravel-actions`
-- **Commands** (`app/Commands/`) — hand-written commands; use `WithSteps` for progress and `OutputsJson` for `--json`
+- **Commands** (`app/Commands/`) — hand-written commands; use `WithSteps` for steps (one Laravel task line each, never a progress bar; wrap no prompts in a step) and `OutputsJson` for `--json`
 - **Generated commands** (`app/Console/`) — `OperationCommand` (one per API operation) and `ResourceCommand` (`rocket servers`), registered in `AppServiceProvider` from the schema. They live outside `app/Commands` because Laravel Zero auto-loads every class there.
 - **API** (`app/Api/`) — Saloon: `RocketeersConnector`, requests, `ListPaginator` (both list shapes), `ApiErrorPresenter`. Every request goes through the `SendApiRequest` action.
 - **Schema** (`app/Schema/`) — `SchemaCache` reads `~/.rocketeers/cache/api-v1.json`, else the bundled snapshot; `SchemaCompactor` reduces GET /v1/docs to what the CLI needs; `CommandNamer` turns route names into command names

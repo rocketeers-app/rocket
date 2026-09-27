@@ -69,8 +69,6 @@ class ImportDatabase extends Command
             ? $this->serverHosts($team, $pathValues)
             : [];
 
-        $this->startProgress($chosen->count());
-
         $directory = $environment['directory_path'] ?? null;
 
         $imported = $chosen->map(function (array $database) use ($slug, $credentialHosts, $directory): array {
@@ -85,8 +83,6 @@ class ImportDatabase extends Command
                 'local' => $local,
             ];
         });
-
-        $this->finishProgress();
 
         if ($this->wantsJson()) {
             return $this->emitJson([
