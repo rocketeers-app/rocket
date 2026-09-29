@@ -21,7 +21,7 @@ it('gives every operation in the schema its own command, clear of the hand-writt
     $operations = app(SchemaCache::class)->operations();
     $commands = array_map(fn ($operation) => $operation->command, array_values($operations));
 
-    expect($operations)->toHaveCount(283)
+    expect($operations)->toHaveCount(286)
         ->and(array_unique($commands))->toHaveCount(count($commands))
         ->and($commands)->not->toContain('me', 'ssh:config', 'setup-token', 'team', 'teams', 'hub', 'api:refresh', 'list', 'help');
 });
