@@ -4,6 +4,7 @@ namespace App\Commands;
 
 use App\Actions\ConfigureDotEnvLocally;
 use App\Actions\ConfigureWpConfigLocally;
+use App\Actions\FindEnvironmentAcrossTeams;
 use App\Actions\GetRemoteDotEnv;
 use App\Actions\GetRemoteWpConfig;
 use App\Actions\GetRepositoryName;
@@ -15,22 +16,24 @@ use App\Actions\PutEnvLocally;
 use App\Actions\PutWpConfigLocally;
 use App\Actions\RsyncSite;
 use App\Actions\SecureSite;
+use App\Commands\Concerns\EnsuresToken;
 use App\Commands\Concerns\OutputsJson;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 
 class Sync extends Command
 {
+    use EnsuresToken;
     use OutputsJson;
     use WithSteps;
 
-    protected $signature = 'sync {site} {--server=}';
+    protected $signature = 'sync {site? : The environment slug; asked for when left out} {--server=}';
 
     protected $description = 'Sync site';
 
     public function handle()
     {
-        $site = $this->argument('site');
+        $site = $this->argument('site') ?: $this->pickSite();
         $server = $this->option('server') ?? $site;
         $isWordPress = (new IsWordPress)($site, $server);
 
@@ -65,5 +68,12 @@ class Sync extends Command
         $this->info("View in browser: https://{$name}.test");
 
         return self::SUCCESS;
+    }
+
+    private function pickSite(): string
+    {
+        $this->ensureToken();
+
+        return (string) (new FindEnvironmentAcrossTeams)(null, $this->canPrompt())['environment']['slug'];
     }
 }

@@ -28,7 +28,7 @@ class RecordPicker
     }
 
     /** @param array<string, string> $pathValues */
-    public function pick(Operation $list, array $pathValues, string $label, bool $required = true): ?string
+    public function pick(Operation $list, array $pathValues, string $label, bool $required = true, string $hint = ''): ?string
     {
         $first = $this->finder->search($list, $pathValues);
 
@@ -41,7 +41,7 @@ class RecordPicker
             options: fn (string $query): array => $this->options($query === '' ? $first : $this->finder->search($list, $pathValues, $query), $required),
             placeholder: 'Type to search',
             scroll: 10,
-            hint: $this->hint($first),
+            hint: ($hint === '' ? '' : "{$hint} · ").$this->hint($first),
             required: $required,
         );
 

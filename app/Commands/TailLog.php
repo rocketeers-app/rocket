@@ -3,7 +3,10 @@
 namespace App\Commands;
 
 use App\Actions\CreateSshConnection;
+use App\Actions\FindEnvironmentAcrossTeams;
+use App\Commands\Concerns\EnsuresToken;
 use App\Commands\Concerns\OutputsJson;
+use App\Exceptions\ApiException;
 use App\Exceptions\StepException;
 use Illuminate\Console\Command;
 use Symfony\Component\Process\Process;
@@ -12,15 +15,19 @@ use function Laravel\Prompts\select;
 
 class TailLog extends Command
 {
+    use EnsuresToken;
     use OutputsJson;
 
-    protected $signature = 'tail {site} {--server=}';
+    protected $signature = 'tail
+        {site? : The environment slug; asked for when left out}
+        {--server=}
+        {--file= : The log file to tail, by path or name; asked for when there are several}';
 
     protected $description = 'Tail a log file on the remote server';
 
     public function handle()
     {
-        $site = $this->argument('site');
+        $site = $this->argument('site') ?: $this->pickSite();
         $server = $this->option('server') ?? $site;
 
         $process = (new CreateSshConnection)($server)
@@ -61,16 +68,45 @@ class TailLog extends Command
             return basename($file);
         }, $files);
 
-        $selected = select(
-            label: 'Which log file?',
-            options: array_combine($files, $labels),
-        );
+        $selected = $this->chooseFile(array_combine($files, $labels));
 
         $this->info('Tailing '.basename($selected).'...');
 
         (new CreateSshConnection)($server)
-            ->configureProcess(fn (Process $process) => $process->setTty(true))
+            ->configureProcess(fn (Process $process) => $process->setTty(Process::isTtySupported()))
             ->onOutput(fn ($type, $line) => $this->output->write($line))
             ->execute("tail -f {$selected}");
+    }
+
+    private function pickSite(): string
+    {
+        $this->ensureToken();
+
+        return (string) (new FindEnvironmentAcrossTeams)(null, $this->canPrompt())['environment']['slug'];
+    }
+
+    private function chooseFile(array $options): string
+    {
+        $file = $this->option('file');
+
+        if (filled($file)) {
+            foreach ($options as $path => $label) {
+                if (in_array($file, [$path, $label, basename($path)], true)) {
+                    return $path;
+                }
+            }
+
+            throw new ApiException("No log file `{$file}`. Found: ".implode(', ', $options).'.', 404);
+        }
+
+        if ($this->canPrompt()) {
+            return select(label: 'Which log file?', options: $options);
+        }
+
+        if (count($options) === 1) {
+            return (string) array_key_first($options);
+        }
+
+        throw new ApiException('Several log files: '.implode(', ', $options).'. Pass --file= to pick one.', 409);
     }
 }

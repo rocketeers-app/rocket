@@ -6,10 +6,10 @@ use App\Actions\FindEnvironmentAcrossTeams;
 use App\Actions\OpenInEditor;
 use App\Actions\SendApiRequest;
 use App\Actions\SummarizeEnvChanges;
-use App\Api\ApiErrorPresenter;
 use App\Api\Requests\CallOperation;
 use App\Commands\Concerns\FollowsDeployments;
 use App\Commands\Concerns\OutputsJson;
+use App\Commands\Concerns\ResolvesTeam;
 use App\Exceptions\ApiException;
 use App\Exceptions\StepException;
 use App\Schema\Operation;
@@ -32,9 +32,10 @@ class EnvEdit extends Command implements SignalableCommandInterface
 {
     use FollowsDeployments;
     use OutputsJson;
+    use ResolvesTeam;
 
     protected $signature = 'env:edit
-        {environment : The environment slug}
+        {environment? : The environment slug; asked for when left out}
         {--deploy : Deploy after saving without asking}
         {--no-deploy : Do not deploy after saving}
         {--team= : Only look in this team}';
@@ -47,17 +48,14 @@ class EnvEdit extends Command implements SignalableCommandInterface
 
     public function handle(): int
     {
-        if (blank(config('rocketeers.api_token'))) {
-            throw ApiErrorPresenter::missingToken();
-        }
+        $this->ensureToken();
 
         if (! $this->canPrompt()) {
             throw new StepException('env:edit opens your editor; run it in a terminal.');
         }
 
-        $slug = (string) $this->argument('environment');
-
-        ['team' => $team, 'environment' => $environment] = (new FindEnvironmentAcrossTeams)($slug, true, $this->option('team'));
+        ['team' => $team, 'environment' => $environment] = (new FindEnvironmentAcrossTeams)($this->argument('environment'), true, $this->teamFilter());
+        $slug = (string) $environment['slug'];
 
         if (! ($environment['supports_env_file'] ?? true)) {
             throw new StepException("{$slug} has no env file: WordPress keeps its configuration in wp-config.php.");

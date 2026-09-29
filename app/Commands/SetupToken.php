@@ -2,14 +2,10 @@
 
 namespace App\Commands;
 
-use App\Actions\FetchCurrentUser;
-use App\Actions\RefreshSchema;
-use App\Actions\SaveApiToken;
 use App\Commands\Concerns\OutputsJson;
 use App\Commands\Concerns\ResolvesTeam;
 use App\Commands\Concerns\WithSteps;
-use App\Exceptions\StepException;
-use App\Support\Teams;
+use App\Exceptions\ApiException;
 use Illuminate\Console\Command;
 
 class SetupToken extends Command
@@ -18,26 +14,21 @@ class SetupToken extends Command
     use ResolvesTeam;
     use WithSteps;
 
-    protected $signature = 'setup-token {token : The Rocket CLI token from Rocketeers, Settings, API}';
+    protected $signature = 'setup-token {token? : The Rocket CLI token from Rocketeers, Settings, API; asked for when left out}';
 
     protected $description = 'Authenticate Rocket with a Rocket CLI token';
 
-    public function handle(Teams $teams): int
+    public function handle(): int
     {
         $token = trim((string) $this->argument('token'));
 
-        $user = $this->step('Verifying token', fn () => (new FetchCurrentUser)($token));
+        if ($token === '') {
+            $token = $this->canPrompt()
+                ? $this->askForToken()
+                : throw new ApiException('Pass the token: rocket setup-token <token>.', 422, errors: ['token' => ['Pass the token as an argument: rocket setup-token <token>.']]);
+        }
 
-        $this->step('Saving token', fn () => (new SaveApiToken)($token));
-
-        $all = $this->step('Fetching your teams', fn () => $teams->all(fresh: true));
-
-        $this->step('Fetching the API schema', function (): void {
-            try {
-                (new RefreshSchema)();
-            } catch (StepException) {
-            }
-        });
+        ['user' => $user, 'teams' => $all] = $this->authenticate($token);
 
         $current = collect($all)->firstWhere('slug', config('rocketeers.default_team'));
         $team = $current ?? (count($all) === 1 || $this->canPrompt() ? $this->chooseTeam() : null);

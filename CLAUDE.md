@@ -37,6 +37,7 @@
 
 ## Key conventions
 - Every command has `--json`: stdout then carries exactly one JSON document and nothing prompts
+- A missing argument, token or team is asked for when someone can answer (`canPrompt()`), and reported (as JSON under `--json`) when nobody can — never a Symfony `Not enough arguments`, so hand-written commands make their arguments optional. `EnsuresToken::ensureToken()` asks for a missing token (`ResolvesTeam` includes it); `ResolvesTeam::teamFilter()` resolves `--team` for commands that search every team, and a `--team` the token does not reach is picked again without being saved as the default. `FindEnvironmentAcrossTeams` searches the environments of every team when the slug is left out or matches nothing, and `IdentifierResolver` falls back to `RecordPicker` the same way
 - Run local processes through `app(CommandLog::class)->run($process)` and SSH through `CreateSshConnection` (a `LoggedSsh`), so `-v` shows each command and its output; `hide()` secrets and `hideOutput()` on SSH reads of env files. Failure messages use `ProcessError::message()` (stderr, else stdout, never empty)
 - Tests: `composer test` (Pest, Saloon `MockClient::global`, the bundled snapshot); `tests/.home` stands in for `~`
 - `db:import {environment}` finds the environment by slug across every team, imports only MySQL/PostgreSQL that run on one of the team's servers (never ClickHouse, Tinybird, PlanetScale, RDS or other external databases), dumps each on the server it lives on, and asks which one when there are several (`--all` takes every one)

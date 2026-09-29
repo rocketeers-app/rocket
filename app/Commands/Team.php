@@ -19,12 +19,18 @@ class Team extends Command
 
     public function handle(Teams $teams): int
     {
-        $identifier = $this->argument('team');
+        $this->ensureToken();
 
-        if (filled($identifier)) {
-            $team = $teams->find((string) $identifier, fresh: true)
-                ?? throw new StepException("Team `{$identifier}` is not one of your teams. Run `rocket teams` to see them.");
+        $identifier = $this->argument('team');
+        $team = filled($identifier) ? $teams->find((string) $identifier, fresh: true) : null;
+
+        if ($team !== null) {
             $teams->select($team);
+        } elseif (filled($identifier) && ! $this->canPrompt()) {
+            throw new StepException("Team `{$identifier}` is not one of your teams. Run `rocket teams` to see them.");
+        } elseif (filled($identifier)) {
+            $this->components->warn("Team `{$identifier}` is not one of your teams.");
+            $team = $this->chooseTeam(fresh: true);
         } elseif ($this->canPrompt()) {
             $team = $this->chooseTeam(fresh: true);
         } else {

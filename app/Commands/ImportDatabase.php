@@ -5,8 +5,8 @@ namespace App\Commands;
 use App\Actions\ChooseDatabases;
 use App\Actions\FindEnvironmentAcrossTeams;
 use App\Actions\ImportServerDatabase;
-use App\Api\ApiErrorPresenter;
 use App\Commands\Concerns\OutputsJson;
+use App\Commands\Concerns\ResolvesTeam;
 use App\Commands\Concerns\WithSteps;
 use App\Exceptions\ApiException;
 use App\Exceptions\StepException;
@@ -25,10 +25,11 @@ use Illuminate\Console\Command;
 class ImportDatabase extends Command
 {
     use OutputsJson;
+    use ResolvesTeam;
     use WithSteps;
 
     protected $signature = 'db:import
-        {environment : The environment slug}
+        {environment? : The environment slug; asked for when left out}
         {--database= : Import only this database, by name}
         {--all : Import every MySQL and PostgreSQL database of the environment}
         {--as= : Name of the local database (when importing one)}
@@ -38,12 +39,10 @@ class ImportDatabase extends Command
 
     public function handle(): int
     {
-        if (blank(config('rocketeers.api_token'))) {
-            throw ApiErrorPresenter::missingToken();
-        }
+        $this->ensureToken();
 
-        $slug = (string) $this->argument('environment');
-        ['team' => $team, 'environment' => $environment] = (new FindEnvironmentAcrossTeams)($slug, $this->canPrompt(), $this->option('team'));
+        ['team' => $team, 'environment' => $environment] = (new FindEnvironmentAcrossTeams)($this->argument('environment'), $this->canPrompt(), $this->teamFilter());
+        $slug = (string) $environment['slug'];
 
         $pathValues = ['team' => (string) $team['slug'], 'environment' => (string) $environment['id']];
         $databases = collect(app(RecordFinder::class)->all($this->operation('api.team.environments.databases.index', $team), $pathValues));

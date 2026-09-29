@@ -63,3 +63,20 @@ it('suggests close matches when a slug matches nothing', function (): void {
 
     expect($code)->toBe(1)->and($output)->toContain('No environment `acme` found', 'Did you mean: Acme production');
 });
+
+it('asks for the record when a slug matches nothing and someone can answer', function (): void {
+    $record = environmentRecord();
+
+    $mock = fakeApi([
+        'api.team.environments.index' => MockResponse::make(['data' => [$record], 'meta' => ['current_page' => 1, 'last_page' => 1, 'total' => 1]]),
+        'api.team.environments.show' => MockResponse::make(['data' => $record]),
+    ]);
+
+    $this->artisan('environments:read', ['environment' => 'acme-prod'])
+        ->expectsQuestion('Environment', 'acme')
+        ->expectsChoice('Environment', 'id:'.$record['id'], ['id:'.$record['id'] => 'Acme production  (acme-production)'])
+        ->expectsOutputToContain('Acme production')
+        ->assertSuccessful();
+
+    $mock->assertSent(fn ($request, $response) => str_ends_with($response->getPendingRequest()->getUrl(), '/acme/environments/'.$record['id']));
+});

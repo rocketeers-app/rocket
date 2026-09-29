@@ -10,8 +10,8 @@ use App\Actions\NotifyLocally;
 use App\Actions\PutEnvLocally;
 use App\Actions\PutWpConfigLocally;
 use App\Actions\ReadRemoteEnvFile;
-use App\Api\ApiErrorPresenter;
 use App\Commands\Concerns\OutputsJson;
+use App\Commands\Concerns\ResolvesTeam;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 
@@ -19,23 +19,22 @@ use Illuminate\Console\Command;
 class EnvPull extends Command
 {
     use OutputsJson;
+    use ResolvesTeam;
     use WithSteps;
 
     protected $signature = 'env:pull
-        {environment : The environment slug}
+        {environment? : The environment slug; asked for when left out}
         {--team= : Only look in this team}';
 
     protected $description = 'Pull the env file of an environment from its server';
 
     public function handle(): int
     {
-        if (blank(config('rocketeers.api_token'))) {
-            throw ApiErrorPresenter::missingToken();
-        }
+        $this->ensureToken();
 
-        $site = (string) $this->argument('environment');
+        ['team' => $team, 'environment' => $environment] = (new FindEnvironmentAcrossTeams)($this->argument('environment'), $this->canPrompt(), $this->teamFilter());
+        $site = (string) $environment['slug'];
 
-        ['team' => $team, 'environment' => $environment] = (new FindEnvironmentAcrossTeams)($site, $this->canPrompt(), $this->option('team'));
         $server = $this->step('Finding a connected server', fn (): string => app(FindConnectedServer::class)->handle($team, $environment));
         $file = $this->step('Fetching the remote env file', fn (): array => app(ReadRemoteEnvFile::class)->handle($server, $site, $environment['directory_path'] ?? null));
 

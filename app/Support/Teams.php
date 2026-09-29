@@ -5,7 +5,7 @@ namespace App\Support;
 use App\Actions\SaveSettings;
 use App\Actions\SendApiRequest;
 use App\Api\Requests\GetMyTeams;
-use App\Exceptions\StepException;
+use App\Exceptions\UnknownTeamException;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -74,7 +74,7 @@ class Teams
         $team = $this->find((string) $identifier) ?? $this->find((string) $identifier, fresh: true);
 
         if ($team === null) {
-            throw new StepException("Team `{$identifier}` is not one of your teams. Run `rocket team` to pick one.");
+            throw new UnknownTeamException((string) $identifier);
         }
 
         return $team;

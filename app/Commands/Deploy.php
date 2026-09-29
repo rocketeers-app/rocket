@@ -3,9 +3,9 @@
 namespace App\Commands;
 
 use App\Actions\FindEnvironmentAcrossTeams;
-use App\Api\ApiErrorPresenter;
 use App\Commands\Concerns\FollowsDeployments;
 use App\Commands\Concerns\OutputsJson;
+use App\Commands\Concerns\ResolvesTeam;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Command\SignalableCommandInterface;
 
@@ -17,9 +17,10 @@ class Deploy extends Command implements SignalableCommandInterface
 {
     use FollowsDeployments;
     use OutputsJson;
+    use ResolvesTeam;
 
     protected $signature = 'deploy
-        {environment : The environment slug}
+        {environment? : The environment slug; asked for when left out}
         {--detach : Start the deployment without following it}
         {--team= : Only look in this team}';
 
@@ -27,13 +28,10 @@ class Deploy extends Command implements SignalableCommandInterface
 
     public function handle(): int
     {
-        if (blank(config('rocketeers.api_token'))) {
-            throw ApiErrorPresenter::missingToken();
-        }
+        $this->ensureToken();
 
-        $slug = (string) $this->argument('environment');
-
-        ['team' => $team, 'environment' => $environment] = (new FindEnvironmentAcrossTeams)($slug, $this->canPrompt(), $this->option('team'));
+        ['team' => $team, 'environment' => $environment] = (new FindEnvironmentAcrossTeams)($this->argument('environment'), $this->canPrompt(), $this->teamFilter());
+        $slug = (string) $environment['slug'];
 
         $deploy = $this->deployOperation($team, follow: ! $this->option('detach'));
         $deployment = $this->startDeployment($deploy, $team, $environment);

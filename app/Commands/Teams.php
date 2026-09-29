@@ -2,12 +2,14 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\EnsuresToken;
 use App\Commands\Concerns\OutputsJson;
 use App\Support\Teams as TeamRepository;
 use Illuminate\Console\Command;
 
 class Teams extends Command
 {
+    use EnsuresToken;
     use OutputsJson;
 
     protected $signature = 'teams';
@@ -16,6 +18,8 @@ class Teams extends Command
 
     public function handle(TeamRepository $teams): int
     {
+        $this->ensureToken();
+
         $all = $teams->all(fresh: true);
 
         if ($this->wantsJson()) {

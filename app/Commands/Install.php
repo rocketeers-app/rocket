@@ -24,9 +24,9 @@ use App\Actions\RunMigrations;
 use App\Actions\SecureSite;
 use App\Actions\SendApiRequest;
 use App\Actions\SetEnvValues;
-use App\Api\ApiErrorPresenter;
 use App\Api\Requests\CallOperation;
 use App\Commands\Concerns\OutputsJson;
+use App\Commands\Concerns\ResolvesTeam;
 use App\Commands\Concerns\WithSteps;
 use App\Exceptions\StepException;
 use App\Schema\SchemaCache;
@@ -49,10 +49,11 @@ use function Laravel\Prompts\confirm;
 class Install extends Command
 {
     use OutputsJson;
+    use ResolvesTeam;
     use WithSteps;
 
     protected $signature = 'install
-        {environment : The environment slug}
+        {environment? : The environment slug; asked for when left out}
         {--database= : Import only this database, by name (with --all: the main connection)}
         {--all : Import every MySQL and PostgreSQL database of the environment}
         {--team= : Only look in this team}';
@@ -61,13 +62,10 @@ class Install extends Command
 
     public function handle(): int
     {
-        if (blank(config('rocketeers.api_token'))) {
-            throw ApiErrorPresenter::missingToken();
-        }
+        $this->ensureToken();
 
-        $slug = (string) $this->argument('environment');
-
-        ['team' => $team, 'environment' => $found] = (new FindEnvironmentAcrossTeams)($slug, $this->canPrompt(), $this->option('team'));
+        ['team' => $team, 'environment' => $found] = (new FindEnvironmentAcrossTeams)($this->argument('environment'), $this->canPrompt(), $this->teamFilter());
+        $slug = (string) $found['slug'];
         $environment = $this->details($team, $found);
         $pathValues = ['team' => (string) $team['slug'], 'environment' => (string) $environment['id']];
 

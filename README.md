@@ -54,7 +54,7 @@ In Rocketeers, go to **Settings, API** and click **Create Rocket CLI token**. Co
 rocket setup-token {token}
 ```
 
-This is the only way to authenticate Rocket. It checks the token right away against the `/me` endpoint and only saves a token that works, to `~/.rocketeers/.env`, readable by you alone. Check which account you're using at any time with `rocket me`.
+Leave the token out and Rocket asks for it; any other command asks for it too when none is saved yet. It checks the token right away against the `/me` endpoint and only saves a token that works, to `~/.rocketeers/.env`, readable by you alone. Check which account you're using at any time with `rocket me`.
 
 ### 2. Sync your SSH config
 
@@ -102,7 +102,7 @@ Add `-v` (or `--verbose`) to `rocket install`, `rocket db:import` or `rocket env
 Sets up a complete local copy of an environment, found by its slug in any of your teams.
 
 ```bash
-rocket install {environment} [--database=] [--all] [--team=]
+rocket install [environment] [--database=] [--all] [--team=]
 ```
 
 Everything comes from the API and from the environment's first connected server, so there's no `--server` or `--php`. Rocket:
@@ -133,8 +133,8 @@ When the environment has a root directory (like `apps/api`), Rocket clones the w
 Deploys an environment, found by its slug in any of your teams, and follows it live until it's done.
 
 ```bash
-rocket deploy {environment} [--detach] [--team=]
-rocket deployments:follow {environment} [deployment] [--team=]
+rocket deploy [environment] [--detach] [--team=]
+rocket deployments:follow [environment] [deployment] [--team=]
 ```
 
 Every finished step gets its own line, with the server in front of it when the environment has more than one. In a terminal, the steps running right now stay below them as `RUNNING` lines until they finish:
@@ -159,7 +159,7 @@ Every finished step gets its own line, with the server in front of it when the e
 Updates a local site with the files, config and database from the server.
 
 ```bash
-rocket sync {site} [--server=]
+rocket sync [site] [--server=]
 ```
 
 1. Rsyncs `/var/www/{site}/current/` to `/var/www/{name}/`, leaving out `.env`, `node_modules`, `vendor` and `storage`
@@ -175,7 +175,7 @@ rocket sync {site} [--server=]
 Replaces the local database with the remote one, without changing any files.
 
 ```bash
-rocket db:import {site} [--server=]
+rocket db:import [environment] [--database=] [--all] [--as=] [--team=]
 ```
 
 Rocket reads the database credentials from the remote `.env` or `wp-config.php`. It then drops and recreates the local database, and streams a gzipped `mysqldump` over SSH straight into your local MySQL. Foreign key checks are turned off during the import, and the time zone of the local MySQL server is set to UTC.
@@ -185,7 +185,7 @@ Rocket reads the database credentials from the remote `.env` or `wp-config.php`.
 Pulls only the environment configuration.
 
 ```bash
-rocket env:pull {site} [--server=]
+rocket env:pull [environment] [--team=]
 ```
 
 This writes the remote `.env` (or `wp-config.php` for WordPress) to your local site and changes it for local use.
@@ -195,7 +195,7 @@ This writes the remote `.env` (or `wp-config.php` for WordPress) to your local s
 Opens the env file of an environment in your editor. Close the editor and Rocket saves it to every server of the environment, then asks whether to deploy.
 
 ```bash
-rocket env:edit {environment} [--deploy] [--no-deploy] [--team=]
+rocket env:edit [environment] [--deploy] [--no-deploy] [--team=]
 ```
 
 ```
@@ -225,17 +225,17 @@ rocket env:edit {environment} [--deploy] [--no-deploy] [--team=]
 Follows a log file on the server in real time.
 
 ```bash
-rocket tail {site} [--server=]
+rocket tail [site] [--server=] [--file=]
 ```
 
-Rocket finds every `*.log` file in `/var/www/{site}/persistent/storage/logs` and `/var/www/{site}/logs`, lets you pick one, and runs `tail -f` on it. Press `Ctrl+C` to stop.
+Rocket finds every `*.log` file in `/var/www/{site}/persistent/storage/logs` and `/var/www/{site}/logs`, lets you pick one (or takes `--file=`, by name or path), and runs `tail -f` on it. Press `Ctrl+C` to stop.
 
 ### `rocket setup-token`
 
-Authenticates Rocket with a Rocket CLI token: it checks the token against `/me` and saves it when it works. This is the only way to authenticate. See [Getting started](#1-set-up-your-token).
+Authenticates Rocket with a Rocket CLI token: it checks the token against `/me` and saves it when it works. Without the token it asks for it. See [Getting started](#1-set-up-your-token).
 
 ```bash
-rocket setup-token {token}
+rocket setup-token [token]
 ```
 
 ### `rocket me`

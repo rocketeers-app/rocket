@@ -389,3 +389,14 @@ it('no longer takes --server or --php', function (): void {
         ->and($definition->hasOption('php'))->toBeFalse()
         ->and($definition->hasArgument('environment'))->toBeTrue();
 });
+
+it('asks which environment to install when it is left out', function (): void {
+    installApi([installDatabase('routine_prod', 'mysql_native')]);
+    recordInstallSteps($this);
+
+    $this->artisan('install')
+        ->expectsQuestion('Environment', 'routine')
+        ->expectsChoice('Environment', '0:'.environmentRecord()['id'], ['0:'.environmentRecord()['id'] => 'Routine production  (routine-production)'])
+        ->expectsOutputToContain('Installed in '.$this->directory)
+        ->assertSuccessful();
+});

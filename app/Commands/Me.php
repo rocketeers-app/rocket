@@ -3,12 +3,14 @@
 namespace App\Commands;
 
 use App\Actions\FetchCurrentUser;
+use App\Commands\Concerns\EnsuresToken;
 use App\Commands\Concerns\OutputsJson;
 use App\Commands\Concerns\WithSteps;
 use Illuminate\Console\Command;
 
 class Me extends Command
 {
+    use EnsuresToken;
     use OutputsJson;
     use WithSteps;
 
@@ -18,6 +20,7 @@ class Me extends Command
 
     public function handle(): int
     {
+        $this->ensureToken();
 
         $user = $this->step('Fetching your account', fn () => (new FetchCurrentUser)());
 

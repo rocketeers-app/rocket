@@ -90,3 +90,17 @@ it('answers with a fixed shape for the hand-written commands', function (): void
         ->and(jsonOf(runCommand('teams', ['--json' => true])[1])['data'])->toHaveCount(1)
         ->and(jsonOf(runCommand('home', ['--json' => true])[1]))->toHaveKeys(['version', 'team', 'resources', 'local', 'account']);
 });
+
+it('reports a missing environment as a JSON error instead of asking', function (string $command): void {
+    $mock = fakeApi([]);
+
+    [$code, $output] = runCommand($command, ['--json' => true]);
+
+    expect($code)->toBe(1)->and(jsonOf($output)['error'])->toBe([
+        'status' => 422,
+        'message' => 'Missing the environment.',
+        'errors' => ['environment' => ['Pass the environment slug as an argument: rocket <command> <environment>.']],
+    ]);
+
+    $mock->assertNothingSent();
+})->with(['deploy', 'install', 'db:import', 'env:pull', 'deployments:follow', 'tail', 'sync']);

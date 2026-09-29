@@ -9,7 +9,8 @@ use function Laravel\Prompts\select;
 
 /**
  * Turns what a person types (`acme-production`, `Acme Production`) into the id the API routes bind on.
- * An id passes straight through; a slug, name or label must match one record exactly.
+ * An id passes straight through; a slug, name or label must match one record exactly, else — when someone
+ * is there to answer — the record is picked from a search.
  */
 class IdentifierResolver
 {
@@ -36,6 +37,13 @@ class IdentifierResolver
 
         if (count($matches) === 1) {
             return $this->pair($matches[0]);
+        }
+
+        if ($matches === [] && $interactive) {
+            $picker = app(RecordPicker::class);
+            $id = (string) $picker->pick($list, $pathValues, ucfirst($noun), hint: "No {$noun} `{$value}` found");
+
+            return ['id' => $id, 'label' => (string) $picker->labelFor($id)];
         }
 
         if ($matches === []) {
