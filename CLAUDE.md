@@ -27,6 +27,7 @@
 - **Schema** (`app/Schema/`) — `SchemaCache` reads `~/.rocketeers/cache/api-v1.json`, else the bundled snapshot; `SchemaCompactor` reduces GET /v1/docs to what the CLI needs; `CommandNamer` turns route names into command names
 - **Support** (`app/Support/`) — `Teams` (cached /me/teams with permissions), `PermissionGate`, `RecordPicker`, `IdentifierResolver`, `FieldPrompter`, `FieldValue`, `OutputRenderer`
 - **StepException** / **ApiException** — thrown on failure; `OutputsJson` catches them and prints a clean error, or `{"error": {...}}` under `--json`
+- **Kernel** (`app/Console/Kernel.php`, bound in `bootstrap/app.php`) — an unknown command is never handed to the default command (`home`) as an argument: with one likely command it asks to run that one, else it suggests; Symfony input errors (unknown option, missing value, too many arguments…) go through `InputErrorRenderer`: one plain sentence, the usage line and `--help`, or `{"error": {...}}` under `--json`
 
 ## Schema conventions
 - Commands are named after the route: `api.team.<item>[.<sub>].<action>` → `item:sub:action`, with `index`→`list`, `show`→`read`, `store`→`create`, `destroy`→`delete`; a list route without a verb gains `list`

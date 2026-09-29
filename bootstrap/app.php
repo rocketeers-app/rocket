@@ -30,7 +30,7 @@ $app->useEnvironmentPath(getenv('HOME').'/.rocketeers');
 
 $app->singleton(
     Illuminate\Contracts\Console\Kernel::class,
-    LaravelZero\Framework\Kernel::class
+    App\Console\Kernel::class
 );
 
 $app->singleton(
