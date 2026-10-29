@@ -2,6 +2,7 @@
 
 namespace App\Api\Requests;
 
+use App\Schema\Field;
 use App\Schema\Operation;
 use Saloon\Enums\Method;
 use Saloon\Http\Request;
@@ -33,7 +34,11 @@ class CallOperation extends Request implements Paginatable
             return new self($operation, $pathValues, $query);
         }
 
-        return new CallOperationWithBody($operation, $pathValues, $query, $body);
+        $sendsFiles = collect($operation->bodyFields)->contains(fn (Field $field): bool => $field->isFile() && ! blank($body[$field->name] ?? null));
+
+        return $sendsFiles
+            ? new CallOperationWithFiles($operation, $pathValues, $query, $body)
+            : new CallOperationWithBody($operation, $pathValues, $query, $body);
     }
 
     public function resolveEndpoint(): string

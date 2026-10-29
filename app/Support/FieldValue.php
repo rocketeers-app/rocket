@@ -5,7 +5,7 @@ namespace App\Support;
 use App\Schema\Field;
 use InvalidArgumentException;
 
-/** Casts what came in on the command line (`--processes=2`, `--domains=a,b`) to what the field expects. */
+/** Casts what came in on the command line (`--processes=2`, `--domains=a,b`, `--video=~/demo.mp4`) to what the field expects; a file field gets the full path of a file that exists. */
 class FieldValue
 {
     public static function cast(Field $field, mixed $raw): mixed
@@ -16,6 +16,12 @@ class FieldValue
 
         if ($raw === 'null' && $field->nullable) {
             return null;
+        }
+
+        if ($field->isFile()) {
+            return $field->isArray()
+                ? collect((array) $raw)->flatMap(fn (mixed $item): array => explode(',', (string) $item))->map(fn (string $path): string => self::file($field, $path))->values()->all()
+                : self::file($field, (string) self::scalar($raw));
         }
 
         return match ($field->type) {
@@ -36,6 +42,19 @@ class FieldValue
             $value === null => '—',
             default => (string) $value,
         };
+    }
+
+    private static function file(Field $field, string $path): string
+    {
+        $path = trim($path);
+        $home = rtrim((string) getenv('HOME'), '/');
+        $path = str_starts_with($path, '~/') ? $home.substr($path, 1) : $path;
+
+        if (! is_file($path) || ! is_readable($path)) {
+            throw new InvalidArgumentException("{$field->name}: there is no readable file at {$path}.");
+        }
+
+        return (string) realpath($path);
     }
 
     private static function boolean(Field $field, mixed $raw): bool

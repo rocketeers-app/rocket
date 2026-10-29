@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Schema\Field;
 use App\Schema\Operation;
+use InvalidArgumentException;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\multiselect;
@@ -43,6 +44,13 @@ class FieldPrompter
         }
 
         return match (true) {
+            $field->isFile() => FieldValue::cast($field, text(
+                label: $label.($field->isArray() ? ' (paths, comma-separated)' : ' (path)'),
+                default: implode(',', array_map('strval', (array) $current)),
+                required: $required,
+                validate: fn (string $value): ?string => $this->validateFiles($field, $value),
+                hint: $hint,
+            ) ?: null),
             $field->type === 'boolean' => confirm(label: $label, default: (bool) ($current ?? $field->default ?? false), hint: $hint),
             in_array($field->type, ['integer', 'number'], true) => FieldValue::cast($field, text(
                 label: $label,
@@ -74,6 +82,21 @@ class FieldPrompter
                 hint: $hint,
             ) ?: null,
         };
+    }
+
+    private function validateFiles(Field $field, string $value): ?string
+    {
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            FieldValue::cast($field, $value);
+        } catch (InvalidArgumentException $exception) {
+            return $exception->getMessage();
+        }
+
+        return null;
     }
 
     private function validateNumber(Field $field, string $value): ?string

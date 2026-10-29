@@ -18,7 +18,7 @@ class Home extends Command
 {
     use OutputsJson;
 
-    private const array LOCAL = ['install', 'sync', 'tail', 'env:pull', 'db:import', 'ssh:config'];
+    private const array LOCAL = ['install', 'sync', 'tail', 'env:pull', 'db:import', 'ssh:config', 'capture'];
 
     private const array ACCOUNT = ['setup-token', 'me', 'team', 'teams', 'hub', 'api:refresh'];
 

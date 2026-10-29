@@ -444,7 +444,9 @@ class OperationCommand extends Command
             $parts[] = '(required)';
         }
 
-        if ($field->enum !== null || $field->itemsEnum !== null) {
+        if ($field->isFile()) {
+            $parts[] = $field->isArray() ? '— paths to local files; repeat the option or separate with commas' : '— path to a local file';
+        } elseif ($field->enum !== null || $field->itemsEnum !== null) {
             $parts[] = 'one of: '.Str::limit(implode(', ', array_map('strval', $field->enum ?? $field->itemsEnum)), 120);
         } elseif ($field->isRelation()) {
             $parts[] = '— slug, name or id';

@@ -21,6 +21,7 @@ View in browser: https://acme.test
 - A local MySQL server with a passwordless `root` user on `127.0.0.1`
 - `git`, `rsync` and `ssh`
 - [nvm](https://github.com/nvm-sh/nvm) for `rocket install` on sites with frontend assets
+- Node.js for `rocket capture`, and `ffmpeg` (`brew install ffmpeg`) for its walkthrough video
 - SSH access as the `rocketeer` user on your Rocketeers servers
 - A writable `/var/www` directory that Herd or Valet serves (for example `herd park` inside `/var/www`)
 
@@ -229,6 +230,33 @@ rocket tail [site] [--server=] [--file=]
 ```
 
 Rocket finds every `*.log` file in `/var/www/{site}/persistent/storage/logs` and `/var/www/{site}/logs`, lets you pick one (or takes `--file=`, by name or path), and runs `tail -f` on it. Press `Ctrl+C` to stop.
+
+### `rocket capture`
+
+Records screenshots and a walkthrough video of your local site from a storyboard, with the same `agent-capture` script that agent sessions run on the agent servers. With `--publish` the result goes to the changelog of an environment.
+
+```bash
+rocket capture [storyboard.json] [--screenshots-only] [--example] [--url=] [--output=] [--publish[=environment]] [--team=]
+```
+
+- `rocket capture --example` prints a storyboard to start from. A storyboard has a `title`, `intro`, `summary`, optional `setup` steps (such as logging in) and up to 12 `scenes`, each with a `title`, `caption`, `goto`, `steps`, `highlight` and `zoom`
+- `--screenshots-only` takes the screenshots alone, without pauses or a video, so a storyboard is quick to get right
+- The site is the Herd or Valet site of the current directory (`https://{directory}.test` when it is secured). Pass `--url` for any other URL
+- Output goes to `~/.rocketeers/capture/media/{directory}`: `screenshots/`, `cards/`, `video.mp4` and `manifest.json`. The directory is emptied at the start of every run, so Rocket refuses an `--output` that already holds other files
+- `--publish` creates a changelog entry on the environment (asked for when you leave it out) with the title, intro, summary, video and every screenshot, plus the current git branch. It needs the `changelog:create` and `changelog:update` permissions, and the team needs changelog storage for the media
+
+The first run installs the Playwright version the agent servers use, with its Chromium, into `~/.rocketeers/capture`. Fonts render a little differently on macOS than on the agent servers, so the pixels are not identical, but the cards and video look the same.
+
+### Changelog commands
+
+The changelog of an environment can also be written field by field. File options take a local path, and Rocket sends them as an upload:
+
+```bash
+rocket environments:changelog:create acme-production --title="Export invoices as CSV" --summary="…" --video=demo.mp4 --screenshots=one.png,two.png
+rocket environments:changelog:update acme-production <entry> --intro="…"
+rocket environments:changelog:video:upload acme-production <entry> --video=demo.mp4
+rocket environments:changelog:screenshots:create acme-production <entry> --screenshot=three.png --title="…" --caption="…"
+```
 
 ### `rocket setup-token`
 

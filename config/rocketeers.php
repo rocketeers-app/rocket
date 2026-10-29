@@ -18,4 +18,9 @@ return [
     'projects_path' => env('ROCKET_PROJECTS_PATH', '/var/www'),
 
     'deployment_poll_interval' => (int) env('ROCKET_DEPLOYMENT_POLL_INTERVAL', 1000),
+
+    'capture' => [
+        'path' => env('ROCKET_CAPTURE_PATH', getenv('HOME').'/.rocketeers/capture'),
+        'playwright_version' => env('ROCKET_PLAYWRIGHT_VERSION', '1.63.0'),
+    ],
 ];

@@ -81,3 +81,64 @@ it('asks for what is missing, picks a relation from a search and asks again afte
 
     $mock->assertSent(fn ($request) => $request->operation->name === 'api.team.daemons.store' && ($request->payload['processes'] ?? null) === 2 && $request->payload['environment_id'] === environmentRecord()['id']);
 });
+
+it('uploads the files a file option points at, as multipart form data', function (): void {
+    $video = Tests\TestCase::HOME.'/demo.mp4';
+    $first = Tests\TestCase::HOME.'/one.png';
+    $second = Tests\TestCase::HOME.'/two.png';
+    file_put_contents($video, 'video');
+    file_put_contents($first, 'png');
+    file_put_contents($second, 'png');
+
+    $mock = fakeApi([
+        'api.team.environments.changelog.store' => MockResponse::make(['data' => ['id' => 'entry-1', 'title' => 'Export invoices']], 201),
+    ]);
+
+    [$code, $output] = runCommand('environments:changelog:create', [
+        'environment' => environmentRecord()['id'], '--title' => 'Export invoices', '--video' => $video,
+        '--screenshots' => [$first, $second], '--pull-request-number' => '42', '--force' => true,
+    ]);
+
+    expect($code)->toBe(0)->and($output)->toContain('Export invoices');
+
+    $mock->assertSent(function ($request): bool {
+        if (! $request instanceof App\Api\Requests\CallOperationWithFiles) {
+            return false;
+        }
+
+        $fields = collect($request->body()->all())->map(fn (Saloon\Data\MultipartValue $value): array => [$value->name, $value->filename ?? $value->value])->all();
+
+        return $fields === [
+            ['title', 'Export invoices'],
+            ['pull_request_number', '42'],
+            ['video', 'demo.mp4'],
+            ['screenshots[]', 'one.png'],
+            ['screenshots[]', 'two.png'],
+        ];
+    });
+});
+
+it('sends a body without files as JSON, even when the operation takes files', function (): void {
+    $mock = fakeApi([
+        'api.team.environments.changelog.store' => MockResponse::make(['data' => ['id' => 'entry-1', 'title' => 'Export invoices']], 201),
+    ]);
+
+    [$code] = runCommand('environments:changelog:create', ['environment' => environmentRecord()['id'], '--title' => 'Export invoices', '--force' => true]);
+
+    expect($code)->toBe(0);
+
+    $mock->assertSent(fn ($request): bool => $request instanceof App\Api\Requests\CallOperationWithBody && $request->payload === ['title' => 'Export invoices']);
+});
+
+it('reports a file option that points at nothing', function (): void {
+    $mock = fakeApi([]);
+
+    [$code, $output] = runCommand('environments:changelog:create', [
+        'environment' => environmentRecord()['id'], '--title' => 'Export invoices', '--video' => '/nowhere/demo.mp4', '--json' => true,
+    ]);
+
+    expect($code)->toBe(1)
+        ->and(json_decode($output, true)['error']['errors']['video'][0])->toContain('no readable file at /nowhere/demo.mp4');
+
+    $mock->assertNothingSent();
+});

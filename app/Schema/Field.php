@@ -26,6 +26,8 @@ final readonly class Field
         public int|float|null $minimum = null,
         public int|float|null $maximum = null,
         public ?int $maxLength = null,
+        public ?string $format = null,
+        public ?string $itemsFormat = null,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -49,6 +51,8 @@ final readonly class Field
             minimum: $data['minimum'] ?? null,
             maximum: $data['maximum'] ?? null,
             maxLength: $data['maxLength'] ?? null,
+            format: $data['format'] ?? null,
+            itemsFormat: $data['items']['format'] ?? null,
         );
     }
 
@@ -72,6 +76,11 @@ final readonly class Field
     public function isArray(): bool
     {
         return $this->type === 'array';
+    }
+
+    public function isFile(): bool
+    {
+        return $this->format === 'binary' || ($this->isArray() && $this->itemsFormat === 'binary');
     }
 
     public function isRelation(): bool
