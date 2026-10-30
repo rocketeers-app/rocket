@@ -28,9 +28,24 @@ class ConfigureDotEnvLocally
         $env = preg_replace('/^REDIS_PASSWORD=(.*)/m', 'REDIS_PASSWORD=null', $env);
         $env = preg_replace('/^REDIS_SCHEME=(.*)/m', 'REDIS_SCHEME=tcp', $env);
         $env = preg_replace('/^REDIS_URL=(.+)/m', 'REDIS_URL=redis://127.0.0.1:6379', $env);
+        $env = preg_replace('/^MEMCACHED_HOST=(.*)/m', 'MEMCACHED_HOST=127.0.0.1', $env);
+        $env = preg_replace('/^MEMCACHED_PORT=(.*)/m', 'MEMCACHED_PORT=11211', $env);
+        $env = preg_replace('/^MEMCACHED_USERNAME=(.*)/m', 'MEMCACHED_USERNAME=null', $env);
+        $env = preg_replace('/^MEMCACHED_PASSWORD=(.*)/m', 'MEMCACHED_PASSWORD=null', $env);
+        $env = preg_replace('/^FILESYSTEM_(DISK|DRIVER)=(.*)/m', 'FILESYSTEM_$1=local', $env);
+        $env = $this->logMail($env);
         $env = preg_replace('/^SESSION_DOMAIN=(.+)/m', '', $env);
 
         return $env;
+    }
+
+    private function logMail(string $env): string
+    {
+        if (preg_match('/^MAIL_(MAILER|DRIVER)=/m', $env) !== 1) {
+            return rtrim($env, "\n").($env === '' ? '' : "\n")."MAIL_MAILER=log\n";
+        }
+
+        return (string) preg_replace('/^MAIL_(MAILER|DRIVER)=(.*)/m', 'MAIL_$1=log', $env);
     }
 
     private function engine(string $env): string

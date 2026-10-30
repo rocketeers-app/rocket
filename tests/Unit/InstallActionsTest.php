@@ -61,8 +61,28 @@ it('points the env at the local redis server', function (): void {
         ->toContain("REDIS_CLIENT=phpredis\n", "REDIS_HOST=127.0.0.1\n", "REDIS_PORT=6379\n", "REDIS_USERNAME=null\n", "REDIS_PASSWORD=null\n")
         ->not->toContain('redis-server.sock', 'secret')
         ->and((new ConfigureDotEnvLocally)->handle("REDIS_HOST=10.0.0.5\nREDIS_SCHEME=tls\n", 'shop'))->toContain("REDIS_HOST=127.0.0.1\n", "REDIS_SCHEME=tcp\n")
-        ->and((new ConfigureDotEnvLocally)->handle("REDIS_URL=redis://shop-production:secret@10.0.0.5:6379\n", 'shop'))->toBe("REDIS_URL=redis://127.0.0.1:6379\n")
+        ->and((new ConfigureDotEnvLocally)->handle("REDIS_URL=redis://shop-production:secret@10.0.0.5:6379\n", 'shop'))->toBe("REDIS_URL=redis://127.0.0.1:6379\nMAIL_MAILER=log\n")
         ->and((new ConfigureDotEnvLocally)->handle("APP_ENV=production\n", 'shop'))->not->toContain('REDIS_');
+});
+
+it('points the env at the local memcached server', function (): void {
+    expect((new ConfigureDotEnvLocally)->handle("MEMCACHED_HOST=10.0.0.5\nMEMCACHED_PORT=11311\nMEMCACHED_USERNAME=shop\nMEMCACHED_PASSWORD=secret\n", 'shop'))
+        ->toContain("MEMCACHED_HOST=127.0.0.1\n", "MEMCACHED_PORT=11211\n", "MEMCACHED_USERNAME=null\n", "MEMCACHED_PASSWORD=null\n")
+        ->not->toContain('10.0.0.5', 'secret')
+        ->and((new ConfigureDotEnvLocally)->handle("APP_ENV=production\nMAIL_MAILER=log\n", 'shop'))->not->toContain('MEMCACHED_');
+});
+
+it('stores files on the local disk instead of the remote one', function (): void {
+    expect((new ConfigureDotEnvLocally)->handle("FILESYSTEM_DISK=s3\nAWS_BUCKET=shop-production\nMAIL_MAILER=log\n", 'shop'))->toBe("FILESYSTEM_DISK=local\nAWS_BUCKET=shop-production\nMAIL_MAILER=log\n")
+        ->and((new ConfigureDotEnvLocally)->handle("FILESYSTEM_DRIVER=\"spaces\"\nMAIL_MAILER=log\n", 'shop'))->toBe("FILESYSTEM_DRIVER=local\nMAIL_MAILER=log\n")
+        ->and((new ConfigureDotEnvLocally)->handle("MAIL_MAILER=log\n", 'shop'))->not->toContain('FILESYSTEM_');
+});
+
+it('writes mail to the log instead of sending it', function (): void {
+    expect((new ConfigureDotEnvLocally)->handle("MAIL_MAILER=postmark\nMAIL_HOST=smtp.postmarkapp.com\n", 'shop'))->toBe("MAIL_MAILER=log\nMAIL_HOST=smtp.postmarkapp.com\n")
+        ->and((new ConfigureDotEnvLocally)->handle("MAIL_DRIVER=\"smtp\"\n", 'shop'))->toBe("MAIL_DRIVER=log\n")
+        ->and((new ConfigureDotEnvLocally)->handle("APP_ENV=production\n", 'shop'))->toBe("APP_ENV=local\nMAIL_MAILER=log\n")
+        ->and((new ConfigureDotEnvLocally)->handle('APP_ENV=production', 'shop'))->toBe("APP_ENV=local\nMAIL_MAILER=log\n");
 });
 
 function fakeNvm(): string
