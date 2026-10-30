@@ -64,6 +64,36 @@ it('suggests close matches when a slug matches nothing', function (): void {
     expect($code)->toBe(1)->and($output)->toContain('No environment `acme` found', 'Did you mean: Acme production');
 });
 
+it('trusts a search that saw every match instead of paging through the whole list', function (): void {
+    $mock = fakeApi([
+        'api.team.environments.index' => MockResponse::make(['data' => [environmentRecord()], 'meta' => ['current_page' => 1, 'last_page' => 1, 'total' => 1]]),
+    ]);
+
+    [$code] = runCommand('environments:read', ['environment' => 'acme', '--no-interaction' => true]);
+
+    expect($code)->toBe(1);
+
+    $mock->assertSentCount(1);
+});
+
+it('pages through the whole list when the search did not see every match', function (): void {
+    $record = environmentRecord();
+    $other = environmentRecord(['id' => 'e2', 'name' => 'Acme staging', 'slug' => 'acme-staging']);
+
+    $mock = fakeApi([
+        'api.team.environments.index' => fn (PendingRequest $pending) => (int) $pending->query()->get('page') === 2
+            ? MockResponse::make(['data' => [$record], 'meta' => ['current_page' => 2, 'last_page' => 2, 'total' => 2]])
+            : MockResponse::make(['data' => [$other], 'meta' => ['current_page' => 1, 'last_page' => 2, 'total' => 2]]),
+        'api.team.environments.show' => MockResponse::make(['data' => $record]),
+    ]);
+
+    [$code] = runCommand('environments:read', ['environment' => 'acme-production']);
+
+    expect($code)->toBe(0);
+
+    $mock->assertSent(fn ($request, $response) => str_ends_with($response->getPendingRequest()->getUrl(), '/acme/environments/'.$record['id']));
+});
+
 it('asks for the record when a slug matches nothing and someone can answer', function (): void {
     $record = environmentRecord();
 

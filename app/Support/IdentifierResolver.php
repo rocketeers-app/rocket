@@ -26,11 +26,11 @@ class IdentifierResolver
             return ['id' => $value, 'label' => $value];
         }
 
-        $searched = $this->finder->search($list, $pathValues, $value)['records'];
-        $matches = $this->exact($searched, $value);
-        $pool = $searched;
+        $searched = $this->finder->search($list, $pathValues, $value);
+        $matches = $this->exact($searched['records'], $value);
+        $pool = $searched['records'];
 
-        if ($matches === []) {
+        if ($matches === [] && ! $searched['complete']) {
             $pool = $this->finder->all($list, $pathValues);
             $matches = $this->exact($pool, $value);
         }
@@ -41,7 +41,7 @@ class IdentifierResolver
 
         if ($matches === [] && $interactive) {
             $picker = app(RecordPicker::class);
-            $id = (string) $picker->pick($list, $pathValues, ucfirst($noun), hint: "No {$noun} `{$value}` found");
+            $id = (string) $picker->pick($list, $pathValues, ucfirst($noun), hint: "No {$noun} `{$value}` found", similar: $searched);
 
             return ['id' => $id, 'label' => (string) $picker->labelFor($id)];
         }

@@ -97,7 +97,8 @@ it('matches the environment on its slug only, never on a name that merely looks 
 
     expect($code)->toBe(0)->and($output)->toContain('habits → local habits');
 
-    $mock->assertNotSent(fn ($request, $response) => array_key_exists('search', $response->getPendingRequest()->query()->all()));
+    $mock->assertSent(fn ($request, $response) => $response->getPendingRequest()->query()->get('search') === 'habits-production');
+    $mock->assertNotSent(fn ($request, $response) => str_ends_with($response->getPendingRequest()->getUrl(), '/environments') && $response->getPendingRequest()->query()->get('page') !== null);
 });
 
 it('asks which database to import when there are several', function (): void {

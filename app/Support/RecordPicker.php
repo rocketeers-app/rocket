@@ -28,9 +28,9 @@ class RecordPicker
     }
 
     /** @param array<string, string> $pathValues */
-    public function pick(Operation $list, array $pathValues, string $label, bool $required = true, string $hint = ''): ?string
+    public function pick(Operation $list, array $pathValues, string $label, bool $required = true, string $hint = '', array $similar = []): ?string
     {
-        $first = $this->finder->search($list, $pathValues);
+        $first = ($similar['records'] ?? []) === [] ? $this->finder->search($list, $pathValues) : $similar;
 
         if ($first['records'] === [] && $required) {
             throw new ApiException("There is nothing to choose for {$label} yet.", 404);

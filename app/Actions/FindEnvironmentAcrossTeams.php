@@ -38,10 +38,10 @@ class FindEnvironmentAcrossTeams
             return $this->pick($list, $teams);
         }
 
-        $matches = collect($teams)
-            ->flatMap(fn (array $candidate): array => collect($this->environmentsIn($list, $candidate, $slug))
-                ->map(fn (array $environment): array => ['team' => $candidate, 'environment' => $environment])
-                ->all())
+        $found = $this->searchTeams($list, $teams, $slug);
+
+        $matches = collect($found)
+            ->filter(fn (array $match): bool => ($match['environment']['slug'] ?? null) === $slug)
             ->values();
 
         if ($matches->isEmpty()) {
@@ -49,7 +49,7 @@ class FindEnvironmentAcrossTeams
                 throw new ApiException("No environment `{$slug}` in any of your teams.", 404);
             }
 
-            return $this->pick($list, $teams, hint: "No environment `{$slug}` in your teams");
+            return $this->pick($list, $teams, hint: "No environment `{$slug}` in your teams", similar: $found);
         }
 
         if ($matches->count() === 1) {
@@ -68,30 +68,22 @@ class FindEnvironmentAcrossTeams
         return $matches[(int) ltrim((string) $index, '#')];
     }
 
-    private function pick(Operation $list, array $teams, string $hint = ''): array
+    private function pick(Operation $list, array $teams, string $hint = '', array $similar = []): array
     {
         $found = [];
 
-        $options = function (string $query) use ($list, $teams, &$found): array {
+        $options = function (array $matches) use ($teams, &$found): array {
             $options = [];
 
-            foreach ($teams as $index => $team) {
-                foreach (app(RecordFinder::class)->search($list, ['team' => (string) $team['slug']], $query)['records'] as $environment) {
-                    $id = Records::id($environment);
-
-                    if ($id === null) {
-                        continue;
-                    }
-
-                    $found["{$index}:{$id}"] = ['team' => $team, 'environment' => $environment];
-                    $options["{$index}:{$id}"] = Records::display($environment).(count($teams) > 1 ? " · team {$team['name']}" : '');
-                }
+            foreach ($matches as $key => $match) {
+                $found[$key] = $match;
+                $options[$key] = Records::display($match['environment']).(count($teams) > 1 ? " · team {$match['team']['name']}" : '');
             }
 
             return $options;
         };
 
-        $first = $options('');
+        $first = $options($similar === [] ? $this->searchTeams($list, $teams, '') : $similar);
 
         if ($first === []) {
             throw new ApiException('There is nothing to choose for Environment yet.', 404);
@@ -99,7 +91,7 @@ class FindEnvironmentAcrossTeams
 
         $key = search(
             label: 'Environment',
-            options: fn (string $query): array => $query === '' ? $first : $options($query),
+            options: fn (string $query): array => $query === '' ? $first : $options($this->searchTeams($list, $teams, $query)),
             placeholder: 'Type to search',
             scroll: 10,
             hint: $hint,
@@ -109,15 +101,26 @@ class FindEnvironmentAcrossTeams
         return $found[(string) $key];
     }
 
-    /**
-     * @param  array<string, mixed>  $team
-     * @return array<int, array<string, mixed>>
-     */
-    private function environmentsIn(Operation $list, array $team, string $slug): array
+    private function searchTeams(Operation $list, array $teams, string $query): array
     {
-        return array_values(array_filter(
-            app(RecordFinder::class)->all($list, ['team' => (string) $team['slug']]),
-            fn (array $environment): bool => ($environment['slug'] ?? null) === $slug,
-        ));
+        $results = app(RecordFinder::class)->searchEach(
+            $list,
+            array_map(fn (array $team): array => ['team' => (string) $team['slug']], $teams),
+            $query,
+        );
+
+        $found = [];
+
+        foreach ($results as $index => $result) {
+            foreach ($result['records'] as $environment) {
+                $id = Records::id($environment);
+
+                if ($id !== null) {
+                    $found["{$index}:{$id}"] = ['team' => $teams[$index], 'environment' => $environment];
+                }
+            }
+        }
+
+        return $found;
     }
 }
