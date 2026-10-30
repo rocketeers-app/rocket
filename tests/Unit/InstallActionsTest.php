@@ -54,6 +54,17 @@ it('points the env at the local database server of the engine', function (): voi
         ->and((new ConfigureDotEnvLocally)->handle("DB_CONNECTION=mysql\nDB_SOCKET=/var/run/mysqld/mysqld.sock\n", 'routine'))->toContain("DB_SOCKET=\n")->not->toContain('mysqld.sock');
 });
 
+it('points the env at the local redis server', function (): void {
+    $socket = "REDIS_CLIENT=phpredis\nREDIS_HOST=/var/run/redis/redis-server.sock\nREDIS_PORT=0\nREDIS_USERNAME=shop-production\nREDIS_PASSWORD=secret\n";
+
+    expect((new ConfigureDotEnvLocally)->handle($socket, 'shop'))
+        ->toContain("REDIS_CLIENT=phpredis\n", "REDIS_HOST=127.0.0.1\n", "REDIS_PORT=6379\n", "REDIS_USERNAME=null\n", "REDIS_PASSWORD=null\n")
+        ->not->toContain('redis-server.sock', 'secret')
+        ->and((new ConfigureDotEnvLocally)->handle("REDIS_HOST=10.0.0.5\nREDIS_SCHEME=tls\n", 'shop'))->toContain("REDIS_HOST=127.0.0.1\n", "REDIS_SCHEME=tcp\n")
+        ->and((new ConfigureDotEnvLocally)->handle("REDIS_URL=redis://shop-production:secret@10.0.0.5:6379\n", 'shop'))->toBe("REDIS_URL=redis://127.0.0.1:6379\n")
+        ->and((new ConfigureDotEnvLocally)->handle("APP_ENV=production\n", 'shop'))->not->toContain('REDIS_');
+});
+
 function fakeNvm(): string
 {
     $nvm = sys_get_temp_dir().'/rocket-nvm-'.uniqid();
@@ -218,6 +229,18 @@ it('shows the error from stdout when a process prints it there, like artisan and
 
     expect(ProcessError::message($process))->toBe('Illuminate\\Database\\QueryException SQLSTATE[HY000] [2002] No such file or directory')
         ->and(ProcessError::message($silent))->toBe('exit code 3 without output');
+});
+
+it('keeps the end of a long error, where composer puts the reason after its progress', function (): void {
+    $process = Process::fromShellCommandline("for i in $(seq 1 200); do echo \"  - Downloading vendor/package-\$i (1.0.0)\" >&2; done; echo 'Your requirements could not be resolved to an installable set of packages.' >&2; exit 2");
+    $process->run();
+
+    $message = ProcessError::message($process);
+
+    expect($message)->toStartWith('…')
+        ->toEndWith('Your requirements could not be resolved to an installable set of packages.')
+        ->not->toContain('package-1 ')
+        ->and(mb_strlen($message))->toBeLessThanOrEqual(1001);
 });
 
 it('logs commands and their output only when verbose, masking secrets and hidden output', function (): void {

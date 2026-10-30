@@ -35,6 +35,7 @@ use App\Support\PermissionGate;
 use App\Support\RecordFinder;
 use Dotenv\Dotenv;
 use Illuminate\Console\Command;
+use Illuminate\Support\Str;
 
 use function Laravel\Prompts\confirm;
 
@@ -44,7 +45,9 @@ use function Laravel\Prompts\confirm;
  * databases, isolates its PHP version, installs its dependencies, migrates and secures https://{name}.test.
  * An environment in a monorepo (a root directory like `apps/api`) clones the whole repository into
  * {projects_path}/{repository}, installs in its root directory, named after that directory's last part,
- * and parks the directory around it in Herd.
+ * and parks the directory around it in Herd. Once the repository, env file and databases are in place, a failing
+ * step (composer, migrations, npm, securing) does not stop the ones after it: the summary names it and the command
+ * exits with 1. Migrations wait for composer and the frontend build for npm install.
  */
 class Install extends Command
 {
@@ -116,23 +119,42 @@ class Install extends Command
             $steps[] = ["Importing {$database['name']} from {$database['server']}", fn () => app(ImportServerDatabase::class)->handle($databases->values()[$index], $slug, [$server], $database['local'], $remoteDirectory)];
         }
 
-        $steps = [...$steps, ...$this->projectSteps($environment, $name, $directory, $repositoryDirectory, $rootDirectory !== null)];
-
         foreach ($steps as [$message, $callback]) {
             $this->step($message, $callback);
+        }
+
+        $failures = [];
+
+        foreach ($this->projectSteps($environment, $name, $directory, $repositoryDirectory, $rootDirectory !== null) as [$message, $callback, $needs]) {
+            if ($needs !== null && in_array($needs, array_column($failures, 'step'), true)) {
+                $reason = lcfirst(Str::after($needs, 'Running ')).' failed';
+                $this->skipStep($message, $reason);
+                $failures[] = ['step' => $message, 'error' => "Skipped: {$reason}.", 'skipped' => true];
+
+                continue;
+            }
+
+            $error = $this->attempt($message, $callback);
+
+            if ($error !== null) {
+                $failures[] = ['step' => $message, 'error' => $error, 'skipped' => false];
+            }
         }
 
         $siteUrl = "https://{$name}.test";
 
         if ($this->wantsJson()) {
-            return $this->emitJson([
+            $this->emitJson([
                 'team' => $team['slug'],
                 'environment' => $slug,
                 'path' => $directory,
                 'repository_path' => $repositoryDirectory,
                 'url' => $siteUrl,
                 'databases' => $imported->all(),
+                'failures' => $failures,
             ]);
+
+            return $failures === [] ? self::SUCCESS : self::FAILURE;
         }
 
         $this->newLine();
@@ -141,11 +163,27 @@ class Install extends Command
             $this->line("  <fg=green>✓</> {$database['name']} → local <fg=cyan>{$database['local']}</> <fg=gray>(".($database['engine'] === 'pgsql' ? 'PostgreSQL' : 'MySQL')." from {$database['server']}".($database['main'] ? ', main connection' : '').')</>');
         }
 
-        $this->line("  <fg=green>✓</> Installed in <fg=cyan>{$directory}</>");
+        if ($failures === []) {
+            $this->line("  <fg=green>✓</> Installed in <fg=cyan>{$directory}</>");
+            $this->newLine();
+            $this->info("View in browser: {$siteUrl}");
+
+            return self::SUCCESS;
+        }
+
+        $this->line("  <fg=yellow>!</> Installed in <fg=cyan>{$directory}</>, but ".count($failures).' '.Str::plural('step', count($failures)).' did not finish:');
+
         $this->newLine();
+
+        foreach ($failures as $failure) {
+            $failure['skipped']
+                ? $this->components->warn("{$failure['step']}: {$failure['error']}")
+                : $this->components->error("{$failure['step']}: {$failure['error']}");
+        }
+
         $this->info("View in browser: {$siteUrl}");
 
-        return self::SUCCESS;
+        return self::FAILURE;
     }
 
     private function details(array $team, array $environment): array
@@ -249,18 +287,18 @@ class Install extends Command
 
         if ($inMonorepo) {
             $parent = dirname($directory);
-            $steps[] = ["Parking {$parent} in Herd", fn () => app(ParkDirectory::class)->handle($parent)];
+            $steps[] = ["Parking {$parent} in Herd", fn () => app(ParkDirectory::class)->handle($parent), null];
         }
 
         if (($environment['is_php_based'] ?? false) && filled($phpVersion)) {
-            $steps[] = ["Isolating PHP {$phpVersion}", fn () => app(IsolatePhpVersion::class)->handle($name, (string) $phpVersion, $directory)];
+            $steps[] = ["Isolating PHP {$phpVersion}", fn () => app(IsolatePhpVersion::class)->handle($name, (string) $phpVersion, $directory), null];
         }
 
-        $steps[] = ['Running composer install', fn () => file_exists("{$directory}/composer.json") ? app(ComposerInstall::class)->handle($name, $directory) : null];
-        $steps[] = ['Running migrations', fn () => file_exists("{$directory}/artisan") ? app(RunMigrations::class)->handle($name, $directory) : null];
-        $steps[] = ['Running npm install', fn () => file_exists("{$directory}/package.json") ? app(NpmInstall::class)->handle($name, $this->usesWorkspaces($repositoryDirectory) ? $repositoryDirectory : $directory) : null];
-        $steps[] = ['Building frontend assets', fn () => file_exists("{$directory}/package.json") ? app(NpmBuild::class)->handle($directory) : null];
-        $steps[] = ['Securing the site', fn () => app(SecureSite::class)->handle($name, $directory)];
+        $steps[] = ['Running composer install', fn () => file_exists("{$directory}/composer.json") ? app(ComposerInstall::class)->handle($name, $directory) : null, null];
+        $steps[] = ['Running migrations', fn () => file_exists("{$directory}/artisan") ? app(RunMigrations::class)->handle($name, $directory) : null, 'Running composer install'];
+        $steps[] = ['Running npm install', fn () => file_exists("{$directory}/package.json") ? app(NpmInstall::class)->handle($name, $this->usesWorkspaces($repositoryDirectory) ? $repositoryDirectory : $directory) : null, null];
+        $steps[] = ['Building frontend assets', fn () => file_exists("{$directory}/package.json") ? app(NpmBuild::class)->handle($directory) : null, 'Running npm install'];
+        $steps[] = ['Securing the site', fn () => app(SecureSite::class)->handle($name, $directory), null];
 
         return $steps;
     }

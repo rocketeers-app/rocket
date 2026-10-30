@@ -127,6 +127,7 @@ it('installs an environment into a directory named after its slug without the la
             'repository_path' => $this->directory,
             'url' => 'https://routine.test',
             'databases' => [['name' => 'routine_prod', 'engine' => 'mysql', 'server' => '10.0.0.9', 'local' => 'routine', 'main' => true]],
+            'failures' => [],
         ])
         ->and(installSteps($this->calls))->toBe(['repository', 'database', 'isolate', 'composer', 'migrate', 'npm', 'build', 'secure'])
         ->and($this->calls[0][1])->toBe([$this->directory, 'git@github.com:acme/routine.git', 'main', false])
@@ -367,8 +368,39 @@ it('shows each step as a task line, and FAIL on the step that fails', function (
         ->and($output)->toMatch('/Preparing the repository on main \.+.* DONE/')
         ->and($output)->toMatch('/Running composer install \.+.* DONE/')
         ->and($output)->toMatch('/Running migrations \.+.* FAIL/')
-        ->and($output)->toContain('Migrations failed: SQLSTATE[HY000] [2002]')
-        ->not->toContain('Running npm install', '[▓', '%');
+        ->and($output)->toMatch('/Running npm install \.+.* DONE/')
+        ->and($output)->toContain('but 1 step did not finish', 'Running migrations: Migrations failed: SQLSTATE[HY000] [2002]', 'View in browser: https://routine.test')
+        ->not->toContain('[▓', '%');
+});
+
+it('keeps going when composer install fails, skips the migrations and names the failure at the end', function (): void {
+    installApi([installDatabase('routine_prod', 'mysql_native')]);
+    recordInstallSteps($this);
+    installMock(ComposerInstall::class)->shouldReceive('handle')->andThrow(new StepException('Composer install failed: Your requirements could not be resolved.'));
+
+    [$code, $output] = runCommand('install', ['environment' => 'routine-production']);
+
+    expect($code)->toBe(1)
+        ->and(installSteps($this->calls))->toBe(['repository', 'database', 'isolate', 'npm', 'build', 'secure'])
+        ->and($output)->toMatch('/Running composer install \.+.* FAIL/')
+        ->and($output)->toMatch('/Running migrations \.+.* SKIPPED/')
+        ->and($output)->toMatch('/Securing the site \.+.* DONE/')
+        ->and($output)->toContain(
+            'but 2 steps did not finish',
+            'Running composer install: Composer install failed: Your requirements could not be resolved.',
+            'Running migrations: Skipped: composer install failed.',
+        );
+
+    $this->calls = [];
+    installMock(ComposerInstall::class)->shouldReceive('handle')->andThrow(new StepException('Composer install failed: Your requirements could not be resolved.'));
+
+    [$code, $output] = runCommand('install', ['environment' => 'routine-production', '--json' => true]);
+
+    expect($code)->toBe(1)
+        ->and(json_decode($output, true)['failures'])->toBe([
+            ['step' => 'Running composer install', 'error' => 'Composer install failed: Your requirements could not be resolved.', 'skipped' => false],
+            ['step' => 'Running migrations', 'error' => 'Skipped: composer install failed.', 'skipped' => true],
+        ]);
 });
 
 it('shows each step on its own line instead of a progress bar with --verbose', function (): void {
