@@ -49,6 +49,38 @@ class ImportServerDatabase
         if (! $process->isSuccessful()) {
             throw new StepException("Importing {$database['name']} failed: ".ProcessError::message($process));
         }
+
+        $this->ensureTables($engine, $localName, (string) $database['name'], $process);
+    }
+
+    public function ensureTables(string $engine, string $localName, string $name, Process $import): void
+    {
+        $count = app(CommandLog::class)->run(Process::fromShellCommandline($this->tableCount($engine, $localName)));
+
+        if (! $count->isSuccessful()) {
+            throw new StepException("Imported {$name}, but could not count its tables: ".ProcessError::message($count));
+        }
+
+        if ((int) trim($count->getOutput()) > 0) {
+            return;
+        }
+
+        if (trim($import->getErrorOutput()) === '') {
+            throw new StepException("Imported {$name}, but it has no tables. The dump printed nothing, so the database on the server looks empty.");
+        }
+
+        throw new StepException("Imported {$name}, but it has no tables. The dump printed: ".ProcessError::message($import));
+    }
+
+    public function tableCount(string $engine, string $localName): string
+    {
+        if ($engine === 'pgsql') {
+            return 'psql --quiet --host=127.0.0.1 --username='.escapeshellarg((string) config('rocketeers.local_pgsql_user')).' --dbname='.escapeshellarg($localName)
+                .' -tAc '.escapeshellarg("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog', 'information_schema')");
+        }
+
+        return 'mysql --host=127.0.0.1 --port=3306 --user=root --password= -N -e '
+            .escapeshellarg("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '".str_replace("'", "''", $localName)."'");
     }
 
     public function postgresDump(string $name): string
@@ -76,12 +108,12 @@ class ImportServerDatabase
             return 'psql --quiet --host=127.0.0.1 --username='.escapeshellarg((string) config('rocketeers.local_pgsql_user')).' --dbname='.escapeshellarg($localName);
         }
 
-        return 'mysql --max-allowed-packet=512M --user=root --password= --init-command="SET FOREIGN_KEY_CHECKS=0;" '.escapeshellarg($localName);
+        return 'mysql --host=127.0.0.1 --port=3306 --max-allowed-packet=512M --user=root --password= --init-command="SET FOREIGN_KEY_CHECKS=0;" '.escapeshellarg($localName);
     }
 
     public function pipeline(string $host, string $dump, string $import): string
     {
-        return 'set -o pipefail; '.self::SSH.' '.escapeshellarg('rocketeer@'.$host).' '.escapeshellarg($dump).' | gunzip | '.$import;
+        return 'set -o pipefail; '.self::SSH.' '.escapeshellarg('rocketeer@'.$host).' '.escapeshellarg('bash -o pipefail -c '.escapeshellarg($dump)).' | gunzip | '.$import;
     }
 
     private function mysqlCredentials(string $host, string $environment, array $credentialHosts, ?string $directory): ?array

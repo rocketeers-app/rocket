@@ -1,10 +1,14 @@
 <?php
 
 use App\Actions\ImportServerDatabase;
+use App\Exceptions\StepException;
+use App\Support\CommandLog;
 use App\Support\Teams;
 use Illuminate\Support\Facades\Storage;
 use Saloon\Http\Faking\MockResponse;
 use Saloon\Http\PendingRequest;
+use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\Process\Process;
 
 beforeEach(function (): void {
     Storage::put(Teams::PATH, (string) json_encode([
@@ -155,7 +159,58 @@ it('dumps each engine the way its server allows, escaping every value', function
     expect($action->postgresDump('ledger'))->toBe("sudo -u postgres pg_dump --no-owner --no-acl 'ledger' | gzip")
         ->and($action->mysqlDump('shop', null))->toStartWith('sudo mysqldump -u root ')->toContain("'shop'")
         ->and($action->mysqlDump('shop', ['DB_USERNAME' => 'shop', 'DB_PASSWORD' => "it's"]))->toStartWith("MYSQL_PWD='it'\\''s' mysqldump --host=127.0.0.1 --user='shop'")
-        ->and($action->pipeline('10.0.0.9', 'dump', 'import'))->toBe("set -o pipefail; ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o ServerAliveInterval=60 'rocketeer@10.0.0.9' 'dump' | gunzip | import");
+        ->and($action->pipeline('10.0.0.9', 'dump', 'import'))->toBe("set -o pipefail; ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o ServerAliveInterval=60 'rocketeer@10.0.0.9' 'bash -o pipefail -c '\\''dump'\\''' | gunzip | import")
+        ->and($action->localImport('mysql', 'shop'))->toStartWith('mysql --host=127.0.0.1 --port=3306 ')->toEndWith(" 'shop'");
+});
+
+function runPipelineLocally(string $pipeline): Process
+{
+    $local = str_replace("ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o ServerAliveInterval=60 'rocketeer@10.0.0.9' ", 'sh -c ', $pipeline);
+
+    return tap(Process::fromShellCommandline('bash -c '.escapeshellarg($local)))->run();
+}
+
+it('fails the import when the dump fails on the server, instead of streaming an empty gzip', function (): void {
+    $withoutRemotePipefail = runPipelineLocally("set -o pipefail; ssh -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o ServerAliveInterval=60 'rocketeer@10.0.0.9' 'false | gzip' | gunzip | wc -c");
+    $pipeline = runPipelineLocally((new ImportServerDatabase)->pipeline('10.0.0.9', 'false | gzip', 'wc -c'));
+
+    expect($withoutRemotePipefail->isSuccessful())->toBeTrue()
+        ->and($pipeline->isSuccessful())->toBeFalse();
+});
+
+it('hands the server its dump with quotes intact, and masks a quoted password in the log', function (): void {
+    $action = new ImportServerDatabase;
+    $echo = runPipelineLocally($action->pipeline('10.0.0.9', 'printf %s '.escapeshellarg("s3c'r3t").' | gzip', 'cat'));
+
+    $output = new BufferedOutput;
+    $log = new CommandLog;
+    $log->enable($output);
+    $dump = $action->mysqlDump('shop', ['DB_USERNAME' => 'shop', 'DB_PASSWORD' => "s3c'r3t"]);
+    $log->hide("s3c'r3t");
+    $log->run(Process::fromShellCommandline('true # '.$action->pipeline('10.0.0.9', $dump, 'import')));
+
+    expect($echo->getOutput())->toBe("s3c'r3t")
+        ->and($output->fetch())->toContain('MYSQL_PWD=')->not->toContain('s3c', 'r3t');
+});
+
+it('counts the tables of the local database on the server the app connects to', function (): void {
+    expect((new ImportServerDatabase)->tableCount('mysql', "o'shop"))
+        ->toBe("mysql --host=127.0.0.1 --port=3306 --user=root --password= -N -e 'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '\\''o'\\'''\\''shop'\\'''");
+});
+
+it('fails an import that leaves the local database without tables, with what the dump printed', function (): void {
+    $action = Mockery::mock(ImportServerDatabase::class)->makePartial();
+    $action->shouldReceive('tableCount')->andReturn('echo 0', 'echo 0', 'echo 12', 'echo nope >&2; exit 1');
+
+    $failedDump = Process::fromShellCommandline('echo "mysqldump: Got error: 1045: Access denied for user" >&2');
+    $failedDump->run();
+    $silentDump = Process::fromShellCommandline('true');
+    $silentDump->run();
+
+    expect(fn () => $action->ensureTables('mysql', 'shop', 'shop', $failedDump))->toThrow(StepException::class, 'Imported shop, but it has no tables. The dump printed: mysqldump: Got error: 1045: Access denied for user')
+        ->and(fn () => $action->ensureTables('mysql', 'shop', 'shop', $silentDump))->toThrow(StepException::class, 'the database on the server looks empty')
+        ->and($action->ensureTables('mysql', 'shop', 'shop', $silentDump))->toBeNull()
+        ->and(fn () => $action->ensureTables('mysql', 'shop', 'shop', $silentDump))->toThrow(StepException::class, 'could not count its tables: nope');
 });
 
 it('recreates a local PostgreSQL database through psql alone, with the name quoted', function (): void {

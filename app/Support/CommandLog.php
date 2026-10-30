@@ -12,6 +12,8 @@ use Symfony\Component\Process\Process;
  */
 class CommandLog
 {
+    private const int SHELL_DEPTH = 3;
+
     private ?OutputInterface $output = null;
 
     private array $secrets = [];
@@ -81,7 +83,13 @@ class CommandLog
     private function escape(string $text): string
     {
         foreach ($this->secrets as $secret) {
-            $text = str_replace([str_replace("'", "'\\''", $secret), $secret], '***', $text);
+            $quotings = [$secret];
+
+            while (count($quotings) <= self::SHELL_DEPTH) {
+                $quotings[] = str_replace("'", "'\\''", end($quotings));
+            }
+
+            $text = str_replace(array_reverse($quotings), '***', $text);
         }
 
         return OutputFormatter::escape($text);
