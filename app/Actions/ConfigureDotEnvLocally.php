@@ -33,19 +33,22 @@ class ConfigureDotEnvLocally
         $env = preg_replace('/^MEMCACHED_USERNAME=(.*)/m', 'MEMCACHED_USERNAME=null', $env);
         $env = preg_replace('/^MEMCACHED_PASSWORD=(.*)/m', 'MEMCACHED_PASSWORD=null', $env);
         $env = preg_replace('/^FILESYSTEM_(DISK|DRIVER|CLOUD)=(.*)/m', 'FILESYSTEM_$1=local', $env);
-        $env = $this->logMail($env);
+        $env = $this->force($env, ['MAIL_MAILER', 'MAIL_DRIVER'], 'log');
+        $env = $this->force($env, ['QUEUE_CONNECTION', 'QUEUE_DRIVER'], 'sync');
         $env = preg_replace('/^SESSION_DOMAIN=(.+)/m', '', $env);
 
         return $env;
     }
 
-    private function logMail(string $env): string
+    private function force(string $env, array $keys, string $value): string
     {
-        if (preg_match('/^MAIL_(MAILER|DRIVER)=/m', $env) !== 1) {
-            return rtrim($env, "\n").($env === '' ? '' : "\n")."MAIL_MAILER=log\n";
+        $pattern = '/^('.implode('|', array_map(fn (string $key): string => preg_quote($key, '/'), $keys)).')=.*$/m';
+
+        if (preg_match($pattern, $env) !== 1) {
+            return rtrim($env, "\n").($env === '' ? '' : "\n")."{$keys[0]}={$value}\n";
         }
 
-        return (string) preg_replace('/^MAIL_(MAILER|DRIVER)=(.*)/m', 'MAIL_$1=log', $env);
+        return (string) preg_replace($pattern, '$1='.$value, $env);
     }
 
     private function engine(string $env): string
