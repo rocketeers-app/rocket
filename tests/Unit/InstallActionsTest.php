@@ -75,6 +75,7 @@ it('points the env at the local memcached server', function (): void {
 it('stores files on the local disk instead of the remote one', function (): void {
     expect((new ConfigureDotEnvLocally)->handle("FILESYSTEM_DISK=s3\nAWS_BUCKET=shop-production\nMAIL_MAILER=log\n", 'shop'))->toBe("FILESYSTEM_DISK=local\nAWS_BUCKET=shop-production\nMAIL_MAILER=log\n")
         ->and((new ConfigureDotEnvLocally)->handle("FILESYSTEM_DRIVER=\"spaces\"\nMAIL_MAILER=log\n", 'shop'))->toBe("FILESYSTEM_DRIVER=local\nMAIL_MAILER=log\n")
+        ->and((new ConfigureDotEnvLocally)->handle("FILESYSTEM_DRIVER=local\nFILESYSTEM_CLOUD=s3\nMAIL_MAILER=log\n", 'shop'))->toBe("FILESYSTEM_DRIVER=local\nFILESYSTEM_CLOUD=local\nMAIL_MAILER=log\n")
         ->and((new ConfigureDotEnvLocally)->handle("MAIL_MAILER=log\n", 'shop'))->not->toContain('FILESYSTEM_');
 });
 

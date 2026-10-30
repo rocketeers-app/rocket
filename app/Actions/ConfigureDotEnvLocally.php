@@ -32,7 +32,7 @@ class ConfigureDotEnvLocally
         $env = preg_replace('/^MEMCACHED_PORT=(.*)/m', 'MEMCACHED_PORT=11211', $env);
         $env = preg_replace('/^MEMCACHED_USERNAME=(.*)/m', 'MEMCACHED_USERNAME=null', $env);
         $env = preg_replace('/^MEMCACHED_PASSWORD=(.*)/m', 'MEMCACHED_PASSWORD=null', $env);
-        $env = preg_replace('/^FILESYSTEM_(DISK|DRIVER)=(.*)/m', 'FILESYSTEM_$1=local', $env);
+        $env = preg_replace('/^FILESYSTEM_(DISK|DRIVER|CLOUD)=(.*)/m', 'FILESYSTEM_$1=local', $env);
         $env = $this->logMail($env);
         $env = preg_replace('/^SESSION_DOMAIN=(.+)/m', '', $env);
 
